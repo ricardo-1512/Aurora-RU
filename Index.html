@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AURORA X - LIVE MONITOR</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #050505; color: white; font-family: ui-sans-serif, system-ui, sans-serif; }
+    .stat-card { background: #111; border: 1px solid #222; border-radius: 1rem; padding: 1.25rem; }
+    .glow-red { text-shadow: 0 0 20px rgba(239, 68, 68, 0.6); color: #ef4444; }
+    .glow-green { text-shadow: 0 0 20px rgba(34, 197, 94, 0.6); color: #22c55e; }
+    input { background: #1a1a1a; border: 1px solid #333; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; }
+  </style>
+</head>
+
+<body class="p-4 md:p-8">
+  <div class="max-w-2xl mx-auto">
+
+    <div class="flex flex-wrap justify-between items-center gap-4 mb-8 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
+      <div>
+        <h1 class="text-xl font-black tracking-tighter">AURORA <span class="text-green-500">X</span></h1>
+        <div id="location-display" class="text-[10px] text-zinc-500 uppercase mt-1">Ortet...</div>
+      </div>
+
+      <div class="flex gap-2 items-center">
+        <input type="text" id="lat" placeholder="Lat" class="w-16" value="50.83">
+        <input type="text" id="lon" placeholder="Lon" class="w-16" value="12.92">
+        <button onclick="updateAurora()" class="bg-green-600 hover:bg-green-500 text-white text-[10px] font-bold py-2 px-3 rounded uppercase transition">Update</button>
+        <button onclick="getUserLocation()" class="bg-zinc-700 hover:bg-zinc-600 p-2 rounded transition" title="Meinen Standort nutzen">
+          📍
+        </button>
+      </div>
+    </div>
+
+    <div class="stat-card mb-6 text-center border-zinc-800 border-2">
+      <span class="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold">Wahrscheinlichkeit</span>
+      <div id="main-status" class="text-5xl font-black my-6 text-zinc-800 font-mono tracking-tighter">ANALYSE</div>
+      <p id="main-rec" class="text-sm text-zinc-400 italic px-4 text-balance">Verbinde mit Satelliten-Daten...</p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-6">
+      <div class="stat-card border-l-4 border-l-blue-500">
+        <span class="text-[10px] text-zinc-500 uppercase block mb-1 font-bold">Magnetfeld (Bz)</span>
+        <div id="bz-val" class="text-2xl font-mono font-bold">--</div>
+        <div class="h-1.5 w-full bg-zinc-800 mt-3 rounded-full overflow-hidden">
+          <div id="bz-bar" class="h-full bg-blue-500 transition-all duration-500" style="width: 50%"></div>
+        </div>
+      </div>
+
+      <div class="stat-card border-l-4 border-l-yellow-500">
+        <span class="text-[10px] text-zinc-500 uppercase block mb-1 font-bold">Sonnenwind</span>
+        <div id="speed-val" class="text-2xl font-mono font-bold inline">--</div>
+        <span class="text-[10px] text-zinc-600 font-bold ml-1 uppercase">km/s</span>
+        <div id="cloud-status" class="text-[10px] mt-3 text-zinc-400 font-bold uppercase">Wetter: --</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="flex justify-between items-center mb-4">
+        <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Magnetometer Trend (24h)</p>
+        <span class="text-[10px] text-zinc-600 bg-zinc-800 px-2 py-0.5 rounded">LIVE</span>
+      </div>
+      <img src="https://www.spaceweatherlive.com/images/widgets/graph_mag_en.php" class="w-full rounded-lg invert brightness-110 contrast-125">
+    </div>
+
+    <footer class="text-center mt-10">
+      <p class="text-[9px] text-zinc-800 uppercase tracking-[0.4em] font-bold mb-2">NOAA DSCOVR Real-Time Feed</p>
+      <div class="flex justify-center gap-4 text-[10px] text-zinc-600 uppercase font-bold">
+        <span>Lat: <span id="footer-lat">--</span></span>
+        <span>Lon: <span id="footer-lon">--</span></span>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // Initialer Ort (Standard Chemnitz)
+    let currentLat = 50.83;
+    let currentLon = 12.92;
+
+    function safeParseCoord(val, fallback) {
+      const n = parseFloat(String(val).trim().replace(",", "."));
+      return Number.isFinite(n) ? n : fallback;
+    }
+
+    // NOAA Realtime kann am Ende leere / ungültige Zeilen haben.
+    // Diese Funktion sucht von hinten die letzte "valide" Zeile, wo Spalte idx eine Zahl ist.
+    function getLastValidRow(table, idx) {
+      if (!Array.isArray(table) || table.length < 2) return null;
+      for (let i = table.length - 1; i >= 1; i--) {
+        const row = table[i];
+        if (!Array.isArray(row) || row.length <= idx) continue;
+        const v = parseFloat(row[idx]);
+        if (Number.isFinite(v)) return row;
+      }
+      return null;
+    }
+
+    function setBzBarColor(bz) {
+      const bar = document.getElementById('bz-bar');
+      bar.classList.remove('bg-blue-500', 'bg-yellow-500', 'bg-red-500', 'bg-green-500');
+
+      // Bz: stark negativ = gut (rot/gelb), positiv = eher schlecht (grün/blau)
+      if (!Number.isFinite(bz)) {
+        bar.classList.add('bg-blue-500');
+        return;
+      }
+      if (bz <= -12) bar.classList.add('bg-red-500');
+      else if (bz <= -5) bar.classList.add('bg-yellow-500');
+      else if (bz <= 0) bar.classList.add('bg-blue-500');
+      else bar.classList.add('bg-green-500');
+    }
+
+    async function getUserLocation() {
+      if (!navigator.geolocation) {
+        document.getElementById('location-display').innerText = "Ortung nicht verfügbar";
+        return;
+      }
+
+      document.getElementById('location-display').innerText = "Versuche Ortung...";
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          currentLat = Number(position.coords.latitude.toFixed(2));
+          currentLon = Number(position.coords.longitude.toFixed(2));
+          document.getElementById('lat').value = currentLat;
+          document.getElementById('lon').value = currentLon;
+          document.getElementById('location-display').innerText = `Standort erkannt ✅ (${currentLat}, ${currentLon})`;
+          updateAurora();
+        },
+        () => {
+          document.getElementById('location-display').innerText = "Ortung abgelehnt – Manuelle Eingabe";
+        },
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    }
+
+    async function updateAurora() {
+      // Werte aus den Feldern holen (sauber als Numbers)
+      const latInput = document.getElementById('lat').value;
+      const lonInput = document.getElementById('lon').value;
+
+      currentLat = safeParseCoord(latInput, currentLat);
+      currentLon = safeParseCoord(lonInput, currentLon);
+
+      // UI: Footer + kleiner Hinweis
+      document.getElementById('footer-lat').innerText = currentLat.toFixed(2);
+      document.getElementById('footer-lon').innerText = currentLon.toFixed(2);
+
+      // Optional: wenn User manuell tippt, nicht dauernd "Ortet..." zeigen
+      const locEl = document.getElementById('location-display');
+      if (locEl.innerText.toLowerCase().includes("ortet") || locEl.innerText.toLowerCase().includes("ablehnt")) {
+        locEl.innerText = `Manuell: (${currentLat.toFixed(2)}, ${currentLon.toFixed(2)})`;
+      }
+
+      try {
+        // NOAA Sonnenwind (Magnetfeld) - Tabelle
+        const magRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json', { cache: "no-store" });
+        const mag = await magRes.json();
+        const lastMagRow = getLastValidRow(mag, 3); // bz_gsm Spalte
+        const bz = lastMagRow ? parseFloat(lastMagRow[3]) : NaN;
+
+        // NOAA Sonnenwind (Plasma) - Tabelle
+        const spdRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json', { cache: "no-store" });
+        const plasma = await spdRes.json();
+        const lastPlasmaRow = getLastValidRow(plasma, 2); // speed Spalte
+        const speed = lastPlasmaRow ? Math.round(parseFloat(lastPlasmaRow[2])) : NaN;
+
+        // UI Updates Sonnenwind
+        document.getElementById('bz-val').innerText = Number.isFinite(bz) ? `${bz.toFixed(1)} nT` : "--";
+        document.getElementById('speed-val').innerText = Number.isFinite(speed) ? String(speed) : "--";
+
+        // Bz-Bar Prozent
+        if (Number.isFinite(bz)) {
+          const bzClamped = Math.max(-20, Math.min(20, bz));
+          const bzPct = Math.round(((bzClamped + 20) / 40) * 100);
+          document.getElementById('bz-bar').style.width = `${bzPct}%`;
+        } else {
+          document.getElementById('bz-bar').style.width = `50%`;
+        }
+        setBzBarColor(bz);
+
+        // Wetter (Open-Meteo, ohne Key)
+        let cloud = null;
+        try {
+          const wxRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=cloud_cover`,
+            { cache: "no-store" }
+          );
+          const wx = await wxRes.json();
+          cloud = wx?.current?.cloud_cover;
+        } catch (e) {
+          cloud = null;
+        }
+
+        const cloudOk = (typeof cloud === "number" && Number.isFinite(cloud));
+        let cloudTxt = "Wetter: --";
+        if (cloudOk) {
+          cloudTxt = cloud > 80
+            ? `Wetter: stark bewölkt ☁️ (${cloud}%)`
+            : cloud > 30
+              ? `Wetter: teils klar ⛅ (${cloud}%)`
+              : `Wetter: klar 🌙 (${cloud}%)`;
+        }
+        document.getElementById('cloud-status').innerText = cloudTxt;
+
+        // Alarm-Logik
+        const statusEl = document.getElementById('main-status');
+        const recEl = document.getElementById('main-rec');
+
+        // Robuste Bedingungen (nur wenn Zahlen valide)
+        const strong = Number.isFinite(bz) && Number.isFinite(speed) && (bz <= -12) && (speed >= 550);
+        const chance = Number.isFinite(bz) && Number.isFinite(speed) && (bz <= -5) && (speed >= 450);
+
+        if (strong) {
+          statusEl.innerText = "ALARM";
+          statusEl.className = "text-5xl font-black my-6 glow-red tracking-tighter transition-all";
+          if (cloudOk && cloud > 80) {
+            recEl.innerText = "WERTE EXTREM! Aber dichte Wolken – Wolkenlücke suchen oder rausfahren.";
+          } else if (cloudOk && cloud <= 80) {
+            recEl.innerText = "RAUS! Wahnsinnswerte und brauchbare Sichtchancen. Richtung Norden, Langzeitbelichtung!";
+          } else {
+            recEl.innerText = "WERTE EXTREM! Wetter unbekannt – Check Wolken & ab in den Norden.";
+          }
+        } else if (chance) {
+          statusEl.innerText = "CHANCE";
+          statusEl.className = "text-5xl font-black my-6 text-yellow-500 tracking-tighter";
+          recEl.innerText = cloudOk && cloud > 80
+            ? "Aktivität erhöht, aber wolkig – wenn’s aufreißt: Kamera bereit halten."
+            : "Aktivität erhöht. Blick nach Norden und Langzeitbelichtung testen.";
+        } else {
+          statusEl.innerText = "RUHIG";
+          statusEl.className = "text-5xl font-black my-6 text-zinc-800 font-mono tracking-tighter";
+          recEl.innerText = "Aktuell keine starken Polarlicht-Bedingungen für diesen Standort.";
+        }
+
+      } catch (err) {
+        console.error("Data Error:", err);
+        document.getElementById('main-status').innerText = "OFFLINE";
+        document.getElementById('main-rec').innerText = "Daten konnten nicht geladen werden (Netzwerk/CORS/Feed).";
+      }
+    }
+
+    // Auto-Update alle 60 Sekunden
+    setInterval(updateAurora, 60000);
+
+    // Erst-Aufruf
+    updateAurora();
+  </script>
+</body>
+</html>
