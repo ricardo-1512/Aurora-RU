@@ -1,250 +1,740 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AURORA X - LIVE MONITOR</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AURORA X — Live Entscheidung</title>
+
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet (Map + draggable Pin) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <style>
-    body { background: #050505; color: white; font-family: ui-sans-serif, system-ui, sans-serif; }
-    .stat-card { background: #111; border: 1px solid #222; border-radius: 1rem; padding: 1.25rem; }
-    .glow-red { text-shadow: 0 0 20px rgba(239, 68, 68, 0.6); color: #ef4444; }
-    .glow-green { text-shadow: 0 0 20px rgba(34, 197, 94, 0.6); color: #22c55e; }
-    input { background: #1a1a1a; border: 1px solid #333; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; }
+    :root{
+      --bg:#050505;
+      --card:#0f0f10;
+      --border:#202022;
+      --muted:#8b8b93;
+    }
+    body{ background:var(--bg); color:#fff; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    .glass{
+      background: radial-gradient(1200px 500px at 20% -10%, rgba(34,197,94,.20), transparent 55%),
+                  radial-gradient(900px 450px at 90% 0%, rgba(59,130,246,.18), transparent 55%),
+                  linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      border:1px solid rgba(255,255,255,.08);
+      box-shadow: 0 30px 80px rgba(0,0,0,.55);
+      backdrop-filter: blur(10px);
+    }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius: 18px;
+      box-shadow: 0 18px 55px rgba(0,0,0,.55);
+    }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    .badge{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.25);
+      border-radius:999px;
+      padding:.25rem .55rem;
+      font-size:10px;
+      letter-spacing:.2em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.65);
+    }
+    .glow-red{ color:#ef4444; text-shadow: 0 0 25px rgba(239, 68, 68, .55); }
+    .glow-yellow{ color:#f59e0b; text-shadow: 0 0 25px rgba(245, 158, 11, .45); }
+    .glow-green{ color:#22c55e; text-shadow: 0 0 25px rgba(34, 197, 94, .50); }
+    .btn{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      transition: transform .12s ease, background .12s ease;
+    }
+    .btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.10); }
+    .btn-primary{
+      background: rgba(34,197,94,.85);
+      border-color: rgba(34,197,94,.35);
+      color:#06210f;
+    }
+    .btn-primary:hover{ background: rgba(34,197,94,.95); }
+    .input{
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #fff;
+      outline: none;
+    }
+    .input:focus{ border-color: rgba(34,197,94,.45); box-shadow: 0 0 0 4px rgba(34,197,94,.12); }
+    #map{ height: 210px; border-radius: 16px; overflow:hidden; border:1px solid rgba(255,255,255,.08); }
+    canvas{ background: rgba(0,0,0,.15); border:1px solid rgba(255,255,255,.06); border-radius: 16px; }
+    a{ color: rgba(255,255,255,.75); }
+    a:hover{ color:#fff; }
   </style>
 </head>
 
 <body class="p-4 md:p-8">
-  <div class="max-w-2xl mx-auto">
+  <div class="max-w-3xl mx-auto">
 
-    <div class="flex flex-wrap justify-between items-center gap-4 mb-8 bg-zinc-900/50 p-4 rounded-xl border border-zinc-800">
-      <div>
-        <h1 class="text-xl font-black tracking-tighter">AURORA <span class="text-green-500">X</span></h1>
-        <div id="location-display" class="text-[10px] text-zinc-500 uppercase mt-1">Ortet...</div>
-      </div>
+    <!-- Header / Location -->
+    <div class="glass rounded-2xl p-4 md:p-5 mb-6">
+      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <div class="flex items-baseline gap-2">
+            <h1 class="text-xl md:text-2xl font-black tracking-tight">AURORA <span class="text-green-400">X</span></h1>
+            <span class="badge" id="dataBadge">LIVE</span>
+          </div>
+          <div class="text-[11px] text-white/55 uppercase tracking-[0.25em] mt-1">
+            Entscheidung für „Geh ich raus oder nicht?“
+          </div>
+          <div id="locationStatus" class="text-[11px] text-white/55 mt-2">Standort: <span class="text-white/80">Chemnitz</span></div>
+        </div>
 
-      <div class="flex gap-2 items-center">
-        <input type="text" id="lat" placeholder="Lat" class="w-16" value="50.83">
-        <input type="text" id="lon" placeholder="Lon" class="w-16" value="12.92">
-        <button onclick="updateAurora()" class="bg-green-600 hover:bg-green-500 text-white text-[10px] font-bold py-2 px-3 rounded uppercase transition">Update</button>
-        <button onclick="getUserLocation()" class="bg-zinc-700 hover:bg-zinc-600 p-2 rounded transition" title="Meinen Standort nutzen">
-          📍
-        </button>
-      </div>
-    </div>
+        <div class="w-full md:w-[56%]">
+          <div class="flex gap-2">
+            <input id="placeInput" class="input w-full text-sm" placeholder="Ort suchen (z. B. Chemnitz, Erzgebirge, …)" autocomplete="off">
+            <button class="btn btn-primary px-4 rounded-xl text-xs font-bold uppercase" id="btnUpdate">Update</button>
+            <button class="btn px-3 rounded-xl" id="btnGPS" title="Meinen Standort nutzen">📍</button>
+          </div>
 
-    <div class="stat-card mb-6 text-center border-zinc-800 border-2">
-      <span class="text-[10px] uppercase tracking-[0.3em] text-zinc-500 font-bold">Wahrscheinlichkeit</span>
-      <div id="main-status" class="text-5xl font-black my-6 text-zinc-800 font-mono tracking-tighter">ANALYSE</div>
-      <p id="main-rec" class="text-sm text-zinc-400 italic px-4 text-balance">Verbinde mit Satelliten-Daten...</p>
-    </div>
+          <!-- simple suggestion list -->
+          <div id="suggestions" class="mt-2 hidden card p-2"></div>
 
-    <div class="grid grid-cols-2 gap-4 mb-6">
-      <div class="stat-card border-l-4 border-l-blue-500">
-        <span class="text-[10px] text-zinc-500 uppercase block mb-1 font-bold">Magnetfeld (Bz)</span>
-        <div id="bz-val" class="text-2xl font-mono font-bold">--</div>
-        <div class="h-1.5 w-full bg-zinc-800 mt-3 rounded-full overflow-hidden">
-          <div id="bz-bar" class="h-full bg-blue-500 transition-all duration-500" style="width: 50%"></div>
+          <div class="mt-2 flex items-center justify-between text-[10px] text-white/45 uppercase tracking-widest">
+            <div>Lat: <span id="latText" class="text-white/70 mono">50.83</span> • Lon: <span id="lonText" class="text-white/70 mono">12.92</span></div>
+            <div>Letztes Update: <span id="updatedAt" class="text-white/70 mono">--:--</span></div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <div class="stat-card border-l-4 border-l-yellow-500">
-        <span class="text-[10px] text-zinc-500 uppercase block mb-1 font-bold">Sonnenwind</span>
-        <div id="speed-val" class="text-2xl font-mono font-bold inline">--</div>
-        <span class="text-[10px] text-zinc-600 font-bold ml-1 uppercase">km/s</span>
-        <div id="cloud-status" class="text-[10px] mt-3 text-zinc-400 font-bold uppercase">Wetter: --</div>
+    <!-- Main Decision -->
+    <div class="card p-6 text-center mb-6">
+      <div class="badge inline-block mb-4">Wahrscheinlichkeit</div>
+      <div id="mainStatus" class="text-5xl md:text-6xl font-black tracking-tight mono text-white/25">ANALYSE</div>
+      <p id="mainRec" class="text-sm md:text-base text-white/60 italic mt-4 px-2">
+        Verbinde mit Satelliten-Daten…
+      </p>
+
+      <div class="mt-5 flex flex-wrap justify-center gap-2 text-[11px] text-white/60">
+        <span class="badge">Bz: <span id="bzChip" class="text-white/80 mono">--</span></span>
+        <span class="badge">Speed: <span id="spdChip" class="text-white/80 mono">--</span></span>
+        <span class="badge">Kp: <span id="kpChip" class="text-white/80 mono">--</span></span>
+        <span class="badge">Wolken: <span id="cloudChip" class="text-white/80 mono">--</span></span>
       </div>
     </div>
 
-    <div class="stat-card">
-      <div class="flex justify-between items-center mb-4">
-        <p class="text-[10px] text-zinc-500 uppercase font-bold tracking-widest">Magnetometer Trend (24h)</p>
-        <span class="text-[10px] text-zinc-600 bg-zinc-800 px-2 py-0.5 rounded">LIVE</span>
+    <!-- Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div class="card p-4">
+        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-2">Magnetfeld (Bz)</div>
+        <div class="text-3xl font-black mono" id="bzVal">--</div>
+        <div class="mt-3 h-2 bg-white/10 rounded-full overflow-hidden">
+          <div id="bzBar" class="h-full bg-blue-500" style="width:50%"></div>
+        </div>
+        <div class="text-[11px] text-white/55 mt-3">Je negativer (südlicher), desto besser fürs Oval.</div>
       </div>
-      <img src="https://www.spaceweatherlive.com/images/widgets/graph_mag_en.php" class="w-full rounded-lg invert brightness-110 contrast-125">
+
+      <div class="card p-4">
+        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-2">Sonnenwind Speed</div>
+        <div class="text-3xl font-black mono"><span id="speedVal">--</span> <span class="text-base text-white/40">km/s</span></div>
+        <div class="text-[11px] text-white/55 mt-3">Hohe Speed + negativer Bz = „Chef’s Kiss“.</div>
+      </div>
+
+      <div class="card p-4">
+        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-2">Wetter</div>
+        <div class="text-3xl font-black mono" id="cloudVal">--</div>
+        <div class="text-[11px] text-white/55 mt-3">Nur grob (Cloud Cover). Lokal kann’s abweichen.</div>
+      </div>
     </div>
 
-    <footer class="text-center mt-10">
-      <p class="text-[9px] text-zinc-800 uppercase tracking-[0.4em] font-bold mb-2">NOAA DSCOVR Real-Time Feed</p>
-      <div class="flex justify-center gap-4 text-[10px] text-zinc-600 uppercase font-bold">
-        <span>Lat: <span id="footer-lat">--</span></span>
-        <span>Lon: <span id="footer-lon">--</span></span>
+    <!-- Map -->
+    <div class="card p-4 mb-6">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Standort-Pin ziehen</div>
+        <div class="badge">draggable</div>
       </div>
-    </footer>
+      <div id="map"></div>
+      <div class="text-[11px] text-white/55 mt-3">
+        Tipp: Zieh den Pin aufs Land raus (dunkler) und check die Wolken dort.
+      </div>
+    </div>
+
+    <!-- Graphs -->
+    <div class="grid grid-cols-1 gap-4 mb-6">
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Bz & Speed (letzte Stunden)</div>
+          <div class="badge">NOAA realtime</div>
+        </div>
+        <canvas id="chartBzSpeed" height="150"></canvas>
+      </div>
+
+      <div class="card p-4">
+        <div class="flex items-center justify-between mb-3">
+          <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Kp Index (letzte 24h)</div>
+          <div class="badge">NOAA Kp</div>
+        </div>
+        <canvas id="chartKp" height="140"></canvas>
+      </div>
+    </div>
+
+    <!-- Link List Footer -->
+    <div class="card p-4">
+      <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-3">Praktische Links</div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.swpc.noaa.gov/">
+          NOAA Space Weather (SWPC)
+        </a>
+        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://services.swpc.noaa.gov/products/">
+          NOAA Data Products (JSON)
+        </a>
+        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.spaceweatherlive.com/">
+          SpaceWeatherLive (Übersicht)
+        </a>
+        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.lightpollutionmap.info/">
+          Light Pollution Map (Dunkle Spots)
+        </a>
+        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.windy.com/">
+          Windy (Wolken/Modelle)
+        </a>
+        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.cleardarksky.com/">
+          Clear Dark Sky (Astro)
+        </a>
+      </div>
+
+      <div class="text-[9px] text-white/30 uppercase tracking-[0.4em] font-bold mt-6 text-center">
+        Aurora X • NOAA + Open-Meteo + OpenStreetMap • v3
+      </div>
+    </div>
+
   </div>
 
   <script>
-    // Initialer Ort (Standard Chemnitz)
+    /**
+     * FEATURES:
+     * - Ortssuche + Autocomplete (OpenStreetMap Nominatim)
+     * - Map mit draggable Pin (Leaflet)
+     * - GPS Button (Geolocation Permission)
+     * - Live Entscheidung (Bz + Speed + Kp + Wolken)
+     * - Graphen: Bz & Speed (letzte ~6h), Kp (letzte 24h)
+     *
+     * Hinweis: Nominatim hat Rate-Limits. Für "private/persönliche Nutzung" ok.
+     * Wenn du’s öffentlich groß machst: eigenes Geocoding oder bezahlten Provider nutzen.
+     */
+
+    // ===== State =====
     let currentLat = 50.83;
     let currentLon = 12.92;
+    let map, marker;
 
-    function safeParseCoord(val, fallback) {
-      const n = parseFloat(String(val).trim().replace(",", "."));
-      return Number.isFinite(n) ? n : fallback;
+    // Charts
+    let chartBzSpeed, chartKp;
+
+    // ===== Helpers =====
+    const $ = (id) => document.getElementById(id);
+
+    function nowHHMM() {
+      const d = new Date();
+      return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
     }
 
-    // NOAA Realtime kann am Ende leere / ungültige Zeilen haben.
-    // Diese Funktion sucht von hinten die letzte "valide" Zeile, wo Spalte idx eine Zahl ist.
-    function getLastValidRow(table, idx) {
-      if (!Array.isArray(table) || table.length < 2) return null;
-      for (let i = table.length - 1; i >= 1; i--) {
-        const row = table[i];
-        if (!Array.isArray(row) || row.length <= idx) continue;
-        const v = parseFloat(row[idx]);
-        if (Number.isFinite(v)) return row;
+    function safeNum(x) {
+      const n = parseFloat(x);
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+
+    function setDecisionUI({ level, text, rec }) {
+      const el = $("mainStatus");
+      const recEl = $("mainRec");
+
+      el.className = "text-5xl md:text-6xl font-black tracking-tight mono";
+      if (level === "ALARM") {
+        el.textContent = "ALARM";
+        el.classList.add("glow-red");
+      } else if (level === "CHANCE") {
+        el.textContent = "CHANCE";
+        el.classList.add("glow-yellow");
+      } else if (level === "WATCH") {
+        el.textContent = "WATCH";
+        el.classList.add("glow-green");
+      } else {
+        el.textContent = "RUHIG";
+        el.classList.add("text-white/25");
       }
-      return null;
+      recEl.textContent = rec || "—";
     }
 
-    function setBzBarColor(bz) {
-      const bar = document.getElementById('bz-bar');
-      bar.classList.remove('bg-blue-500', 'bg-yellow-500', 'bg-red-500', 'bg-green-500');
-
-      // Bz: stark negativ = gut (rot/gelb), positiv = eher schlecht (grün/blau)
-      if (!Number.isFinite(bz)) {
-        bar.classList.add('bg-blue-500');
+    function setBzBar(bz) {
+      const bar = $("bzBar");
+      if (bz === null) {
+        bar.style.width = "50%";
+        bar.className = "h-full bg-blue-500";
         return;
       }
-      if (bz <= -12) bar.classList.add('bg-red-500');
-      else if (bz <= -5) bar.classList.add('bg-yellow-500');
-      else if (bz <= 0) bar.classList.add('bg-blue-500');
-      else bar.classList.add('bg-green-500');
+      // visual: -20..+20 -> 0..100
+      const pct = Math.round(((clamp(bz, -20, 20) + 20) / 40) * 100);
+      bar.style.width = pct + "%";
+
+      // color by thresholds
+      bar.className = "h-full";
+      if (bz <= -12) bar.classList.add("bg-red-500");
+      else if (bz <= -5) bar.classList.add("bg-yellow-500");
+      else if (bz <= 0) bar.classList.add("bg-blue-500");
+      else bar.classList.add("bg-green-500");
     }
 
-    async function getUserLocation() {
+    function cloudText(cloud) {
+      if (cloud === null) return { label: "--", chip: "--" };
+      if (cloud >= 80) return { label: `☁️ ${cloud}%`, chip: `${cloud}%` };
+      if (cloud >= 35) return { label: `⛅ ${cloud}%`, chip: `${cloud}%` };
+      return { label: `🌙 ${cloud}%`, chip: `${cloud}%` };
+    }
+
+    // ===== Geocoding (Autocomplete) =====
+    let suggestTimer = null;
+
+    async function fetchSuggestions(q) {
+      // Nominatim Search
+      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q=${encodeURIComponent(q)}`;
+      const res = await fetch(url, {
+        headers: {
+          // Nominatim wünscht einen identifiable User-Agent. Browser lässt das nicht sauber setzen.
+          // Für private Nutzung okay; wenn du hostest: besser serverseitig proxen.
+          "Accept": "application/json"
+        },
+        cache: "no-store"
+      });
+      return await res.json();
+    }
+
+    function renderSuggestions(items) {
+      const box = $("suggestions");
+      if (!items || items.length === 0) {
+        box.classList.add("hidden");
+        box.innerHTML = "";
+        return;
+      }
+      box.classList.remove("hidden");
+      box.innerHTML = items.map((it, idx) => `
+        <button class="w-full text-left px-3 py-2 rounded-xl hover:bg-white/5 transition"
+                data-lat="${it.lat}" data-lon="${it.lon}" data-name="${(it.display_name || "").replace(/"/g,'&quot;')}">
+          <div class="text-sm text-white/85">${it.display_name}</div>
+          <div class="text-[11px] text-white/45 mono">lat ${Number(it.lat).toFixed(3)} • lon ${Number(it.lon).toFixed(3)}</div>
+        </button>
+      `).join("");
+
+      [...box.querySelectorAll("button")].forEach(btn => {
+        btn.addEventListener("click", () => {
+          const lat = safeNum(btn.dataset.lat);
+          const lon = safeNum(btn.dataset.lon);
+          const name = btn.dataset.name || "Standort gesetzt";
+          if (lat === null || lon === null) return;
+
+          setLocation(lat, lon, name);
+          $("placeInput").value = name.split(",").slice(0,2).join(",").trim();
+          box.classList.add("hidden");
+          box.innerHTML = "";
+          updateAll();
+        });
+      });
+    }
+
+    function setupAutocomplete() {
+      const input = $("placeInput");
+      input.addEventListener("input", () => {
+        const q = input.value.trim();
+        if (suggestTimer) clearTimeout(suggestTimer);
+        if (q.length < 3) {
+          renderSuggestions([]);
+          return;
+        }
+        suggestTimer = setTimeout(async () => {
+          try {
+            const items = await fetchSuggestions(q);
+            renderSuggestions(items);
+          } catch (e) {
+            renderSuggestions([]);
+          }
+        }, 250);
+      });
+
+      // close suggestions on outside click
+      document.addEventListener("click", (e) => {
+        if (!$("suggestions").contains(e.target) && e.target !== input) {
+          $("suggestions").classList.add("hidden");
+        }
+      });
+    }
+
+    // ===== Map =====
+    function setupMap() {
+      map = L.map('map', { zoomControl: false }).setView([currentLat, currentLon], 9);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
+      marker = L.marker([currentLat, currentLon], { draggable: true }).addTo(map);
+      marker.on("dragend", () => {
+        const p = marker.getLatLng();
+        setLocation(p.lat, p.lng, `Manuell: (${p.lat.toFixed(2)}, ${p.lng.toFixed(2)})`);
+        updateAll();
+      });
+    }
+
+    function setLocation(lat, lon, label) {
+      currentLat = lat;
+      currentLon = lon;
+
+      $("latText").textContent = lat.toFixed(2);
+      $("lonText").textContent = lon.toFixed(2);
+      $("locationStatus").innerHTML = `Standort: <span class="text-white/80">${label}</span>`;
+
+      if (map && marker) {
+        marker.setLatLng([lat, lon]);
+        map.setView([lat, lon], map.getZoom(), { animate: true });
+      }
+    }
+
+    async function useGPS() {
       if (!navigator.geolocation) {
-        document.getElementById('location-display').innerText = "Ortung nicht verfügbar";
+        $("locationStatus").innerHTML = `Standort: <span class="text-white/80">GPS nicht verfügbar</span>`;
         return;
       }
-
-      document.getElementById('location-display').innerText = "Versuche Ortung...";
+      $("locationStatus").innerHTML = `Standort: <span class="text-white/80">GPS… bitte erlauben</span>`;
       navigator.geolocation.getCurrentPosition(
-        (position) => {
-          currentLat = Number(position.coords.latitude.toFixed(2));
-          currentLon = Number(position.coords.longitude.toFixed(2));
-          document.getElementById('lat').value = currentLat;
-          document.getElementById('lon').value = currentLon;
-          document.getElementById('location-display').innerText = `Standort erkannt ✅ (${currentLat}, ${currentLon})`;
-          updateAurora();
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          setLocation(lat, lon, `GPS ✅ (${lat.toFixed(2)}, ${lon.toFixed(2)})`);
+          updateAll();
         },
         () => {
-          document.getElementById('location-display').innerText = "Ortung abgelehnt – Manuelle Eingabe";
+          $("locationStatus").innerHTML = `Standort: <span class="text-white/80">GPS abgelehnt</span>`;
         },
         { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
       );
     }
 
-    async function updateAurora() {
-      // Werte aus den Feldern holen (sauber als Numbers)
-      const latInput = document.getElementById('lat').value;
-      const lonInput = document.getElementById('lon').value;
+    // ===== NOAA Data =====
+    function lastValidRow(table, valueIndex) {
+      if (!Array.isArray(table) || table.length < 2) return null;
+      for (let i = table.length - 1; i >= 1; i--) {
+        const row = table[i];
+        if (!Array.isArray(row) || row.length <= valueIndex) continue;
+        const v = safeNum(row[valueIndex]);
+        if (v !== null) return row;
+      }
+      return null;
+    }
 
-      currentLat = safeParseCoord(latInput, currentLat);
-      currentLon = safeParseCoord(lonInput, currentLon);
+    // get last N points from table within approx last hours (by simply slicing last N)
+    function lastNValidRows(table, valueIndex, n) {
+      const out = [];
+      if (!Array.isArray(table) || table.length < 2) return out;
+      for (let i = table.length - 1; i >= 1 && out.length < n; i--) {
+        const row = table[i];
+        if (!Array.isArray(row) || row.length <= valueIndex) continue;
+        const v = safeNum(row[valueIndex]);
+        if (v === null) continue;
+        out.push(row);
+      }
+      return out.reverse();
+    }
 
-      // UI: Footer + kleiner Hinweis
-      document.getElementById('footer-lat').innerText = currentLat.toFixed(2);
-      document.getElementById('footer-lon').innerText = currentLon.toFixed(2);
+    async function fetchSolarWind() {
+      // mag: time_tag, bx_gsm, by_gsm, bz_gsm, lon_gsm, lat_gsm, bt
+      const magRes = await fetch("https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json", { cache: "no-store" });
+      const mag = await magRes.json();
+      const magLast = lastValidRow(mag, 3);
+      const bz = magLast ? safeNum(magLast[3]) : null;
+      const magTime = magLast ? magLast[0] : null;
 
-      // Optional: wenn User manuell tippt, nicht dauernd "Ortet..." zeigen
-      const locEl = document.getElementById('location-display');
-      if (locEl.innerText.toLowerCase().includes("ortet") || locEl.innerText.toLowerCase().includes("ablehnt")) {
-        locEl.innerText = `Manuell: (${currentLat.toFixed(2)}, ${currentLon.toFixed(2)})`;
+      // plasma: time_tag, density, speed, temperature
+      const plRes = await fetch("https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json", { cache: "no-store" });
+      const pl = await plRes.json();
+      const plLast = lastValidRow(pl, 2);
+      const speed = plLast ? safeNum(plLast[2]) : null;
+      const plTime = plLast ? plLast[0] : null;
+
+      // trend: last ~72 points (~6h if 5-min cadence)
+      const magTrend = lastNValidRows(mag, 3, 72);
+      const plTrend = lastNValidRows(pl, 2, 72);
+
+      return { bz, speed, magTime, plTime, magTrend, plTrend };
+    }
+
+    async function fetchKp() {
+      // Kp 1-day: header + rows: time_tag, kp_index
+      const kpRes = await fetch("https://services.swpc.noaa.gov/products/noaa-planetary-k-index-1-day.json", { cache: "no-store" });
+      const kp = await kpRes.json();
+
+      const kpLast = lastValidRow(kp, 1);
+      const kpVal = kpLast ? safeNum(kpLast[1]) : null;
+      const kpTime = kpLast ? kpLast[0] : null;
+
+      // last 24 points (hourly-ish / 3-hourly depending) -> we just take last 24 rows
+      const rows = [];
+      if (Array.isArray(kp) && kp.length > 2) {
+        for (let i = kp.length - 1; i >= 1 && rows.length < 24; i--) {
+          const row = kp[i];
+          if (!Array.isArray(row) || row.length < 2) continue;
+          const v = safeNum(row[1]);
+          if (v === null) continue;
+          rows.push(row);
+        }
+      }
+      rows.reverse();
+      return { kpVal, kpTime, kpTrend: rows };
+    }
+
+    // ===== Weather =====
+    async function fetchCloudCover(lat, lon) {
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=cloud_cover`;
+      const res = await fetch(url, { cache: "no-store" });
+      const wx = await res.json();
+      const cloud = wx?.current?.cloud_cover;
+      return (typeof cloud === "number" && Number.isFinite(cloud)) ? cloud : null;
+    }
+
+    // ===== Charts =====
+    function buildChartBzSpeed(labels, bzArr, spdArr) {
+      const ctx = $("chartBzSpeed").getContext("2d");
+      if (chartBzSpeed) chartBzSpeed.destroy();
+
+      chartBzSpeed = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [
+            {
+              label: "Bz (nT)",
+              data: bzArr,
+              tension: 0.25,
+              pointRadius: 0,
+              borderWidth: 2,
+              yAxisID: "yBz"
+            },
+            {
+              label: "Speed (km/s)",
+              data: spdArr,
+              tension: 0.25,
+              pointRadius: 0,
+              borderWidth: 2,
+              yAxisID: "ySpd"
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: "rgba(255,255,255,.7)" } },
+            tooltip: { enabled: true }
+          },
+          scales: {
+            x: {
+              ticks: { color: "rgba(255,255,255,.55)", maxTicksLimit: 8 },
+              grid: { color: "rgba(255,255,255,.06)" }
+            },
+            yBz: {
+              position: "left",
+              ticks: { color: "rgba(255,255,255,.55)" },
+              grid: { color: "rgba(255,255,255,.06)" }
+            },
+            ySpd: {
+              position: "right",
+              ticks: { color: "rgba(255,255,255,.55)" },
+              grid: { drawOnChartArea: false }
+            }
+          }
+        }
+      });
+    }
+
+    function buildChartKp(labels, kpArr) {
+      const ctx = $("chartKp").getContext("2d");
+      if (chartKp) chartKp.destroy();
+
+      chartKp = new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels,
+          datasets: [
+            { label: "Kp", data: kpArr, borderWidth: 0 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: "rgba(255,255,255,.7)" } }
+          },
+          scales: {
+            x: {
+              ticks: { color: "rgba(255,255,255,.55)", maxTicksLimit: 8 },
+              grid: { color: "rgba(255,255,255,.06)" }
+            },
+            y: {
+              suggestedMin: 0,
+              suggestedMax: 9,
+              ticks: { color: "rgba(255,255,255,.55)" },
+              grid: { color: "rgba(255,255,255,.06)" }
+            }
+          }
+        }
+      });
+    }
+
+    function toHHMMfromISO(iso) {
+      if (!iso) return "";
+      // iso example "2026-01-20 20:45:00.000"
+      const t = iso.split(" ")[1] || "";
+      return t.slice(0,5);
+    }
+
+    // ===== Decision Logic (verständlich, aber brauchbar) =====
+    function computeDecision({ bz, speed, kpVal, cloud }) {
+      // Base thresholds
+      const bzStrong = (bz !== null && bz <= -12);
+      const bzOk = (bz !== null && bz <= -5);
+
+      const spdStrong = (speed !== null && speed >= 550);
+      const spdOk = (speed !== null && speed >= 450);
+
+      const kpStrong = (kpVal !== null && kpVal >= 6);
+      const kpOk = (kpVal !== null && kpVal >= 4);
+
+      const cloudBad = (cloud !== null && cloud >= 85);
+
+      // Weighted-ish decision
+      if (bzStrong && spdStrong && (kpOk || kpStrong)) {
+        return {
+          level: "ALARM",
+          rec: cloudBad
+            ? "Werte brutal gut – aber Wolken dick. Wenn’s aufreißt: sofort los."
+            : "RAUS! Sehr starke Bedingungen. Norden + kurze Belichtungen testen."
+        };
       }
 
+      if (bzOk && spdOk && kpOk) {
+        return {
+          level: "CHANCE",
+          rec: cloudBad
+            ? "Aktivität gut, aber wolkig. Beobachten & auf Lücken warten."
+            : "Gute Chance. Rausfahren (dunkel), Kamera bereit, Norden checken."
+        };
+      }
+
+      if ((bzOk && spdOk) || (kpStrong && bzOk)) {
+        return {
+          level: "WATCH",
+          rec: cloudBad
+            ? "Werte interessant, aber Wolken. Ich würde Watch-Modus lassen."
+            : "Watch: möglich, wenn es weiter anzieht. Alle 10–15 Min checken."
+        };
+      }
+
+      return {
+        level: "RUHIG",
+        rec: "Aktuell eher nichts für Sachsen. Kann sich schnell drehen – später nochmal laden."
+      };
+    }
+
+    // ===== Main Update =====
+    async function updateAll() {
+      $("dataBadge").textContent = "LIVE";
+      $("updatedAt").textContent = nowHHMM();
+
+      setDecisionUI({ level: "RUHIG", rec: "Lade Daten…" });
+
       try {
-        // NOAA Sonnenwind (Magnetfeld) - Tabelle
-        const magRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json', { cache: "no-store" });
-        const mag = await magRes.json();
-        const lastMagRow = getLastValidRow(mag, 3); // bz_gsm Spalte
-        const bz = lastMagRow ? parseFloat(lastMagRow[3]) : NaN;
+        const [sw, kp] = await Promise.all([fetchSolarWind(), fetchKp()]);
+        const cloud = await fetchCloudCover(currentLat, currentLon);
 
-        // NOAA Sonnenwind (Plasma) - Tabelle
-        const spdRes = await fetch('https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json', { cache: "no-store" });
-        const plasma = await spdRes.json();
-        const lastPlasmaRow = getLastValidRow(plasma, 2); // speed Spalte
-        const speed = lastPlasmaRow ? Math.round(parseFloat(lastPlasmaRow[2])) : NaN;
+        // UI Chips
+        const bz = sw.bz;
+        const speed = sw.speed;
+        const kpVal = kp.kpVal;
 
-        // UI Updates Sonnenwind
-        document.getElementById('bz-val').innerText = Number.isFinite(bz) ? `${bz.toFixed(1)} nT` : "--";
-        document.getElementById('speed-val').innerText = Number.isFinite(speed) ? String(speed) : "--";
+        $("bzVal").textContent = (bz === null) ? "--" : `${bz.toFixed(1)} nT`;
+        $("speedVal").textContent = (speed === null) ? "--" : `${Math.round(speed)}`;
+        const ct = cloudText(cloud);
+        $("cloudVal").textContent = ct.label;
 
-        // Bz-Bar Prozent
-        if (Number.isFinite(bz)) {
-          const bzClamped = Math.max(-20, Math.min(20, bz));
-          const bzPct = Math.round(((bzClamped + 20) / 40) * 100);
-          document.getElementById('bz-bar').style.width = `${bzPct}%`;
-        } else {
-          document.getElementById('bz-bar').style.width = `50%`;
+        $("bzChip").textContent = (bz === null) ? "--" : `${bz.toFixed(1)}nT`;
+        $("spdChip").textContent = (speed === null) ? "--" : `${Math.round(speed)}km/s`;
+        $("kpChip").textContent = (kpVal === null) ? "--" : kpVal.toFixed(1);
+        $("cloudChip").textContent = (cloud === null) ? "--" : `${cloud}%`;
+
+        setBzBar(bz);
+
+        // Decision
+        const decision = computeDecision({ bz, speed, kpVal, cloud });
+        setDecisionUI(decision);
+
+        // Graph data (Bz+Speed) - align by index (best-effort)
+        const bzRows = sw.magTrend;
+        const spdRows = sw.plTrend;
+
+        const len = Math.min(bzRows.length, spdRows.length);
+        const labels = [];
+        const bzArr = [];
+        const spdArr = [];
+
+        // take last "len" from both
+        const bzSlice = bzRows.slice(-len);
+        const spdSlice = spdRows.slice(-len);
+
+        for (let i = 0; i < len; i++) {
+          labels.push(toHHMMfromISO(bzSlice[i][0]) || String(i));
+          bzArr.push(parseFloat(bzSlice[i][3]));
+          spdArr.push(parseFloat(spdSlice[i][2]));
         }
-        setBzBarColor(bz);
+        buildChartBzSpeed(labels, bzArr, spdArr);
 
-        // Wetter (Open-Meteo, ohne Key)
-        let cloud = null;
-        try {
-          const wxRes = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=cloud_cover`,
-            { cache: "no-store" }
-          );
-          const wx = await wxRes.json();
-          cloud = wx?.current?.cloud_cover;
-        } catch (e) {
-          cloud = null;
-        }
+        // Kp graph
+        const kpLabels = kp.kpTrend.map(r => toHHMMfromISO(r[0]) || r[0]);
+        const kpArr = kp.kpTrend.map(r => parseFloat(r[1]));
+        buildChartKp(kpLabels, kpArr);
 
-        const cloudOk = (typeof cloud === "number" && Number.isFinite(cloud));
-        let cloudTxt = "Wetter: --";
-        if (cloudOk) {
-          cloudTxt = cloud > 80
-            ? `Wetter: stark bewölkt ☁️ (${cloud}%)`
-            : cloud > 30
-              ? `Wetter: teils klar ⛅ (${cloud}%)`
-              : `Wetter: klar 🌙 (${cloud}%)`;
-        }
-        document.getElementById('cloud-status').innerText = cloudTxt;
-
-        // Alarm-Logik
-        const statusEl = document.getElementById('main-status');
-        const recEl = document.getElementById('main-rec');
-
-        // Robuste Bedingungen (nur wenn Zahlen valide)
-        const strong = Number.isFinite(bz) && Number.isFinite(speed) && (bz <= -12) && (speed >= 550);
-        const chance = Number.isFinite(bz) && Number.isFinite(speed) && (bz <= -5) && (speed >= 450);
-
-        if (strong) {
-          statusEl.innerText = "ALARM";
-          statusEl.className = "text-5xl font-black my-6 glow-red tracking-tighter transition-all";
-          if (cloudOk && cloud > 80) {
-            recEl.innerText = "WERTE EXTREM! Aber dichte Wolken – Wolkenlücke suchen oder rausfahren.";
-          } else if (cloudOk && cloud <= 80) {
-            recEl.innerText = "RAUS! Wahnsinnswerte und brauchbare Sichtchancen. Richtung Norden, Langzeitbelichtung!";
-          } else {
-            recEl.innerText = "WERTE EXTREM! Wetter unbekannt – Check Wolken & ab in den Norden.";
-          }
-        } else if (chance) {
-          statusEl.innerText = "CHANCE";
-          statusEl.className = "text-5xl font-black my-6 text-yellow-500 tracking-tighter";
-          recEl.innerText = cloudOk && cloud > 80
-            ? "Aktivität erhöht, aber wolkig – wenn’s aufreißt: Kamera bereit halten."
-            : "Aktivität erhöht. Blick nach Norden und Langzeitbelichtung testen.";
-        } else {
-          statusEl.innerText = "RUHIG";
-          statusEl.className = "text-5xl font-black my-6 text-zinc-800 font-mono tracking-tighter";
-          recEl.innerText = "Aktuell keine starken Polarlicht-Bedingungen für diesen Standort.";
+        // Last update timestamp from feeds (optional)
+        const feedTime = sw.magTime || sw.plTime || kp.kpTime;
+        if (feedTime) {
+          $("dataBadge").textContent = "LIVE • " + toHHMMfromISO(feedTime);
         }
 
-      } catch (err) {
-        console.error("Data Error:", err);
-        document.getElementById('main-status').innerText = "OFFLINE";
-        document.getElementById('main-rec').innerText = "Daten konnten nicht geladen werden (Netzwerk/CORS/Feed).";
+      } catch (e) {
+        console.error(e);
+        $("dataBadge").textContent = "OFFLINE";
+        setDecisionUI({ level: "RUHIG", rec: "Daten konnten nicht geladen werden (Netzwerk/Feed). Refresh probieren." });
       }
     }
 
-    // Auto-Update alle 60 Sekunden
-    setInterval(updateAurora, 60000);
+    // ===== Buttons / Init =====
+    $("btnUpdate").addEventListener("click", () => updateAll());
+    $("btnGPS").addEventListener("click", () => useGPS());
 
-    // Erst-Aufruf
-    updateAurora();
+    setupAutocomplete();
+    setupMap();
+
+    // initial
+    setLocation(currentLat, currentLon, "Chemnitz");
+    updateAll();
+
+    // auto refresh
+    setInterval(updateAll, 60000);
   </script>
 </body>
 </html>
