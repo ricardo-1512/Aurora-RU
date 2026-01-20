@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AURORA X — Robuste Version (v8)</title>
+  <title>AURORA X — App Style</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/suncalc@1.9.0/suncalc.min.js"></script>
 
   <style>
     :root{ --bg:#050505; }
@@ -17,77 +18,164 @@
 
     .glass{
       background:
-        radial-gradient(1200px 500px at 20% -10%, rgba(34,197,94,.15), transparent 55%),
+        radial-gradient(1200px 500px at 20% -10%, rgba(34,197,94,.16), transparent 55%),
         linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
       border:1px solid rgba(255,255,255,.08);
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 60px rgba(0,0,0,.45);
     }
-
     .card{
       background: rgba(255,255,255,.03);
       border:1px solid rgba(255,255,255,.08);
       border-radius: 18px;
       box-shadow: 0 18px 55px rgba(0,0,0,.35);
     }
-
     .badge{
-      border:1px solid rgba(255,255,255,.1);
-      background: rgba(0,0,0,.3);
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(0,0,0,.35);
       border-radius:999px;
-      padding:.2rem .5rem;
+      padding:.22rem .55rem;
       font-size:10px;
       letter-spacing:.12em;
       text-transform: uppercase;
-      color: rgba(255,255,255,.65);
+      color: rgba(255,255,255,.68);
       white-space: nowrap;
     }
+    .glow-red{ color:#ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, .55); }
+    .glow-yellow{ color:#f59e0b; text-shadow: 0 0 20px rgba(245, 158, 11, .45); }
+    .glow-green{ color:#22c55e; text-shadow: 0 0 20px rgba(34, 197, 94, .45); }
 
-    .glow-red{ color:#ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, .5); }
-    .glow-yellow{ color:#f59e0b; text-shadow: 0 0 20px rgba(245, 158, 11, .4); }
-    .glow-green{ color:#22c55e; text-shadow: 0 0 20px rgba(34, 197, 94, .4); }
-
-    .btn-primary{ background: #22c55e; color:#052e16; font-weight: 800; }
-    .btn-primary:hover{ filter: brightness(1.05); }
+    .btn-primary{ background: #22c55e; color:#052e16; font-weight: 900; }
+    .btn-primary:hover{ filter: brightness(1.06); }
 
     .input{
-      background: rgba(0,0,0,.5);
-      border:1px solid rgba(255,255,255,.1);
-      border-radius: 10px;
-      padding: 8px 12px;
+      background: rgba(0,0,0,.52);
+      border:1px solid rgba(255,255,255,.11);
+      border-radius: 14px;
+      padding: 10px 12px;
       color: #fff;
       outline: none;
     }
 
     #map{
-      height: 210px;
-      border-radius: 14px;
+      height: 230px;
+      border-radius: 16px;
       border:1px solid rgba(255,255,255,.1);
       overflow:hidden;
     }
 
-    .chart-wrap{
-      height: 200px;
-      width:100%;
-      position:relative;
+    .chart-wrap{ height: 220px; width:100%; position:relative; }
+    canvas{ width:100% !important; height:100% !important; display:block; }
+
+    /* Autocomplete dropdown */
+    .ac-wrap{ position:relative; flex:1; }
+    .ac-list{
+      position:absolute; left:0; right:0; top:calc(100% + 8px);
+      background: rgba(10,10,10,.95);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      overflow:hidden;
+      box-shadow: 0 22px 70px rgba(0,0,0,.6);
+      z-index: 9999;
+      display:none;
+    }
+    .ac-item{
+      padding: 10px 12px;
+      font-size: 13px;
+      color: rgba(255,255,255,.9);
+      border-bottom: 1px solid rgba(255,255,255,.06);
+      cursor:pointer;
+    }
+    .ac-item:hover{ background: rgba(255,255,255,.06); }
+    .ac-sub{ font-size:11px; color: rgba(255,255,255,.55); margin-top:2px; }
+
+    /* Bottom tab bar (visual only, scroll-to sections) */
+    .tabbar{
+      position: sticky;
+      bottom: 12px;
+      margin-top: 18px;
+      z-index: 50;
+    }
+    .tab-inner{
+      display:flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 18px;
+      background: rgba(0,0,0,.55);
+      border: 1px solid rgba(255,255,255,.08);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 60px rgba(0,0,0,.55);
+    }
+    .tab{
+      flex:1;
+      text-align:center;
+      padding: 10px 8px;
+      border-radius: 14px;
+      font-size: 11px;
+      color: rgba(255,255,255,.65);
+      border: 1px solid transparent;
+      user-select:none;
+    }
+    .tab:hover{ background: rgba(255,255,255,.06); }
+    .tab.active{
+      background: rgba(34,197,94,.18);
+      border-color: rgba(34,197,94,.22);
+      color: rgba(255,255,255,.92);
     }
 
-    /* Fix: prevents the “chart grows longer and longer” bug on some mobiles */
-    canvas{
-      width:100% !important;
-      height:100% !important;
-      display:block;
+    /* Twilight vertical timeline look */
+    .tw-grid{ display:grid; grid-template-columns: 1fr 16px 1fr; gap: 12px; align-items: center; }
+    .tw-line{
+      height: 160px;
+      width: 3px;
+      border-radius: 999px;
+      background: rgba(245,158,11,.75);
+      margin: 0 auto;
+      position: relative;
+      opacity: .9;
+    }
+    .tw-dot{
+      position:absolute; left:50%;
+      transform: translateX(-50%);
+      width: 12px; height: 12px;
+      border-radius: 999px;
+      background: rgba(245,158,11,1);
+      box-shadow: 0 0 18px rgba(245,158,11,.5);
+    }
+    .pill{
+      display:inline-flex; align-items:center; justify-content:center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid rgba(245,158,11,.25);
+      background: rgba(245,158,11,.10);
+      color: rgba(255,255,255,.85);
+      font-size: 11px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-top: 10px;
+    }
+
+    /* Small moon curve */
+    .moon-canvas{
+      width:100%;
+      height: 80px;
+      border-radius: 14px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.07);
     }
   </style>
 </head>
 
 <body class="p-4">
-  <div class="max-w-2xl mx-auto">
+  <div class="max-w-2xl mx-auto pb-10">
 
-    <!-- Header -->
-    <div class="glass rounded-2xl p-5 mb-4">
+    <!-- HEADER -->
+    <section id="sec-now" class="glass rounded-2xl p-5 mb-4">
       <div class="flex justify-between items-start mb-4">
         <div>
-          <h1 class="text-xl font-black">AURORA <span class="text-green-400">X</span></h1>
+          <h1 class="text-xl font-black tracking-tight">AURORA <span class="text-green-400">X</span></h1>
           <div class="flex items-center gap-2 mt-2">
             <span class="badge" id="statusBadge">CHECKING…</span>
             <span class="badge">Lat: <span class="mono" id="latText">50.83</span></span>
@@ -100,40 +188,46 @@
         </div>
       </div>
 
-      <div class="flex gap-2">
-        <input id="placeInput" class="input flex-grow text-sm" placeholder="Ort suchen… (optional)">
-        <button class="btn-primary px-4 py-2 rounded-xl text-xs" id="btnUpdate">UPDATE</button>
+      <div class="flex gap-2 items-center">
+        <div class="ac-wrap">
+          <input id="placeInput" class="input w-full text-sm" placeholder="Ort suchen… (Chemnitz, Dresden, …)" autocomplete="off">
+          <div id="acList" class="ac-list"></div>
+        </div>
+        <button class="btn-primary px-4 py-3 rounded-2xl text-xs" id="btnUpdate">UPDATE</button>
+        <button class="px-3 py-3 rounded-2xl text-xs border border-white/10 bg-black/30 hover:bg-white/5" id="btnGPS" title="Standort übernehmen">📍</button>
       </div>
 
       <div class="text-[11px] text-white/45 mt-3">
-        Tipp: Zieh den Pin auf einen dunkleren Spot außerhalb der Stadt und prüf dort Wolken.
+        Tipp: Zieh den Pin raus aus der Stadt (dunkler) und prüf Wolken dort.
       </div>
-    </div>
+    </section>
 
-    <!-- Map directly under header (as you wanted) -->
-    <div class="card p-4 mb-4">
+    <!-- MAP -->
+    <section id="sec-map" class="card p-4 mb-4">
       <div class="flex justify-between items-center mb-3">
         <div class="text-[10px] text-white/40 font-bold uppercase tracking-widest">Standort-Pin (draggable)</div>
         <span class="badge">Night Map</span>
       </div>
       <div id="map"></div>
-    </div>
+    </section>
 
-    <!-- Decision -->
-    <div class="card p-8 text-center mb-4">
+    <!-- DECISION -->
+    <section id="sec-alarm" class="card p-8 text-center mb-4">
+      <div class="badge inline-flex mb-3">Wahrscheinlichkeit</div>
       <div id="mainStatus" class="text-6xl font-black tracking-tighter mb-2 text-white/20">ANALYSE</div>
-      <p id="mainRec" class="text-sm text-white/50 italic">Daten werden abgefragt…</p>
+      <p id="mainRec" class="text-sm text-white/55 italic">Daten werden abgefragt…</p>
 
       <div class="flex flex-wrap justify-center gap-2 mt-6">
         <span class="badge">Bz: <span id="chipBz" class="mono">--</span></span>
         <span class="badge">Spd: <span id="chipSpd" class="mono">--</span></span>
         <span class="badge">Kp: <span id="chipKp" class="mono">--</span></span>
         <span class="badge">Cloud: <span id="chipCloud" class="mono">--</span></span>
+        <span class="badge">Mond: <span id="chipMoon" class="mono">--</span></span>
       </div>
-    </div>
+    </section>
 
-    <!-- Small cards -->
-    <div class="grid grid-cols-2 gap-3 mb-4">
+    <!-- CORE VALUES -->
+    <section class="grid grid-cols-2 gap-3 mb-4">
       <div class="card p-4">
         <div class="text-[10px] text-white/40 uppercase font-bold mb-1">Sonnenwind</div>
         <div class="text-2xl font-bold mono" id="valSpd">--</div>
@@ -144,10 +238,10 @@
         <div class="text-2xl font-bold mono" id="valBz">--</div>
         <div class="text-[10px] text-white/30 italic">nT (Süd-Ausrichtung)</div>
       </div>
-    </div>
+    </section>
 
-    <!-- Chart -->
-    <div class="card p-4 mb-4">
+    <!-- CHART -->
+    <section id="sec-charts" class="card p-4 mb-4">
       <div class="flex justify-between items-center mb-3">
         <div class="text-[10px] text-white/40 font-bold uppercase tracking-widest">Bz & Speed Verlauf (letzte ~60 Min)</div>
         <span class="badge">Filtered • aligned</span>
@@ -155,24 +249,138 @@
       <div class="chart-wrap">
         <canvas id="chartMain"></canvas>
       </div>
+    </section>
+
+    <!-- TWILIGHT + MOON (App style) -->
+    <section class="card p-5 mb-4">
+      <div class="flex justify-between items-center mb-4">
+        <div class="text-[12px] font-black tracking-wide text-white/85">DÄMMERUNG UND MORGENGRAUEN</div>
+        <span class="badge" id="twState">—</span>
+      </div>
+
+      <div class="tw-grid">
+        <!-- Left column -->
+        <div class="space-y-3">
+          <div class="flex justify-between items-baseline">
+            <div class="text-[11px] text-white/45">(Sonnenuntergang)</div>
+            <div class="text-[22px] font-black mono" id="sunset">--:--</div>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="badge">Bürgerlich</span>
+            <span class="mono text-[16px] font-bold" id="duskCivil">--:--</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="badge">Nautisch</span>
+            <span class="mono text-[16px] font-bold" id="duskNautical">--:--</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="badge">Astronomisch</span>
+            <span class="mono text-[16px] font-bold" id="duskAstro">--:--</span>
+          </div>
+        </div>
+
+        <!-- Center line -->
+        <div class="text-center">
+          <div class="tw-line">
+            <div class="tw-dot" id="twDot" style="top: 78px;"></div>
+          </div>
+          <div class="pill" id="twPill">Nacht</div>
+        </div>
+
+        <!-- Right column -->
+        <div class="space-y-3">
+          <div class="flex justify-between items-baseline">
+            <div class="text-[11px] text-white/45">(Sonnenaufgang)</div>
+            <div class="text-[22px] font-black mono" id="sunrise">--:--</div>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="badge">Bürgerlich</span>
+            <span class="mono text-[16px] font-bold" id="dawnCivil">--:--</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="badge">Nautisch</span>
+            <span class="mono text-[16px] font-bold" id="dawnNautical">--:--</span>
+          </div>
+          <div class="flex justify-between items-center">
+            <span class="badge">Astronomisch</span>
+            <span class="mono text-[16px] font-bold" id="dawnAstro">--:--</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card p-5 mb-4">
+      <div class="flex justify-between items-center mb-4">
+        <div class="text-[12px] font-black tracking-wide text-white/85">DER MOND</div>
+        <span class="badge" id="moonBadge">—</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mb-4">
+        <div class="card p-4 !rounded-2xl !border-white/5 !bg-white/3">
+          <div class="text-[10px] text-white/40 uppercase font-bold mb-2">Mondaufgang</div>
+          <div class="mono text-[18px] font-black" id="moonRise">--:--</div>
+        </div>
+        <div class="card p-4 !rounded-2xl !border-white/5 !bg-white/3">
+          <div class="text-[10px] text-white/40 uppercase font-bold mb-2">Monduntergang</div>
+          <div class="mono text-[18px] font-black" id="moonSet">--:--</div>
+        </div>
+      </div>
+
+      <canvas id="moonCurve" class="moon-canvas mb-4"></canvas>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="card p-4 !rounded-2xl !border-white/5 !bg-white/3">
+          <div class="text-[10px] text-white/40 uppercase font-bold mb-2">Mondphase</div>
+          <div class="text-[14px] font-bold text-white/85" id="moonPhase">—</div>
+        </div>
+        <div class="card p-4 !rounded-2xl !border-white/5 !bg-white/3">
+          <div class="text-[10px] text-white/40 uppercase font-bold mb-2">Beleuchtung</div>
+          <div class="mono text-[18px] font-black"><span id="moonIllum">--</span>%</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer-ish -->
+    <div class="text-center text-[10px] text-white/25 mt-6 tracking-[.35em] uppercase">
+      Aurora X • NOAA + Open-Meteo + SunCalc + OSM • v1
+    </div>
+
+    <!-- Bottom tabs -->
+    <div class="tabbar">
+      <div class="tab-inner">
+        <div class="tab active" data-target="sec-now">Jetzt</div>
+        <div class="tab" data-target="sec-alarm">Alarm</div>
+        <div class="tab" data-target="sec-map">Karte</div>
+        <div class="tab" data-target="sec-charts">Grafiken</div>
+      </div>
     </div>
 
   </div>
 
   <script>
+    // ===== STATE =====
     let currentLat = 50.83, currentLon = 12.92;
     let chartMain = null;
     let map, marker;
 
     const $ = id => document.getElementById(id);
 
+    // ===== HELPERS =====
     function nowHHMM() {
       return new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
     }
-
     function safeNum(x) {
       const n = parseFloat(x);
       return Number.isFinite(n) ? n : null;
+    }
+    function fmtTime(d) {
+      if (!d || !(d instanceof Date) || isNaN(d.getTime())) return "--:--";
+      return d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    }
+    function isoToHHMMSS(iso) {
+      if (!iso) return "";
+      const t = (iso.split(" ")[1] || "");
+      return t.slice(0, 8);
     }
 
     async function fetchJson(url, timeoutMs = 12000) {
@@ -189,7 +397,6 @@
       }
     }
 
-    // Robust: scan backwards until you find a finite number
     function findLastValid(data, index) {
       if (!data || !Array.isArray(data) || data.length < 2) return null;
       for (let i = data.length - 1; i >= 1; i--) {
@@ -201,7 +408,6 @@
       return null;
     }
 
-    // Build timestamp->speed map for alignment (NO index-matching!)
     function buildSpeedMap(plasma) {
       const m = new Map();
       if (!plasma || !Array.isArray(plasma)) return m;
@@ -213,12 +419,6 @@
         m.set(t, spd);
       }
       return m;
-    }
-
-    function isoToHHMMSS(iso) {
-      if (!iso) return "";
-      const t = (iso.split(" ")[1] || "");
-      return t.slice(0, 8); // HH:MM:SS (prevents duplicate x labels)
     }
 
     function setBadge(mode) {
@@ -240,18 +440,17 @@
       $("mainRec").textContent = text || "";
     }
 
-    async function update() {
-      setBadge("CHECK");
+    // ===== NOAA + WEATHER UPDATE =====
+    async function updateAll() {
+      setBadge("CHECKING");
       $("updateTime").textContent = nowHHMM();
 
-      // 1) Pull feeds in parallel
       const [magData, plasmaData, kpData] = await Promise.all([
         fetchJson("https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json", 15000),
         fetchJson("https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json", 15000),
         fetchJson("https://services.swpc.noaa.gov/products/noaa-planetary-k-index-1-day.json", 15000)
       ]);
 
-      // 2) Extract last valid values
       const bzObj = findLastValid(magData, 3);
       const spdObj = findLastValid(plasmaData, 2);
       const kpObj = findLastValid(kpData, 1);
@@ -260,12 +459,14 @@
       const spd = spdObj ? spdObj.val : null;
       const kp  = kpObj  ? kpObj.val  : null;
 
-      // 3) Weather (cloud cover)
       let cloud = null;
       const wx = await fetchJson(`https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=cloud_cover`, 10000);
       if (wx && wx.current && Number.isFinite(wx.current.cloud_cover)) cloud = wx.current.cloud_cover;
 
-      // 4) UI update
+      // Moon + twilight (client-side via SunCalc)
+      const moonInfo = updateMoonAndTwilight();
+
+      // UI values
       $("valBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
       $("valSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
 
@@ -273,32 +474,30 @@
       $("chipSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
       $("chipKp").textContent  = (kp !== null)  ? kp.toFixed(1) : "--";
       $("chipCloud").textContent = (cloud !== null) ? `${cloud}%` : "--";
+      $("chipMoon").textContent = (moonInfo && typeof moonInfo.illumPct === "number") ? `${moonInfo.illumPct}%` : "--";
 
       const hasAny = (bz !== null) || (spd !== null) || (kp !== null) || (cloud !== null);
-      const hasCore = (bz !== null) && (spd !== null); // your core decision data
+      const hasCore = (bz !== null) && (spd !== null);
 
       if (!hasAny) setBadge("OFFLINE");
       else if (!hasCore) setBadge("DEGRADED");
       else setBadge("LIVE");
 
-      // 5) Decision logic (safe)
+      // Decision (honest + practical)
       if (bz !== null && spd !== null && bz <= -10 && spd >= 500) {
         setMainStatus("ALARM", "Hervorragende Werte! Geh raus (Norden, Langzeitbelichtung).");
       } else if ((bz !== null && bz <= -4) || (kp !== null && kp >= 4)) {
-        setMainStatus("CHANCE", "Beobachten! Es tut sich was. Check auch OVATION + Magnetometer.");
+        setMainStatus("CHANCE", "Beobachten! Aktivität erhöht – check Horizont & Dunkelspot.");
       } else if (bz !== null || spd !== null || kp !== null) {
-        setMainStatus("RUHIG", "Aktuell keine signifikante Aktivität.");
+        setMainStatus("RUHIG", "Aktuell eher nichts. Später nochmal laden.");
       } else {
         setMainStatus("RUHIG", "Keine Daten (Feed/Netzwerk). Refresh probieren.");
       }
 
-      if (cloud !== null && cloud > 80) {
-        $("mainRec").textContent += " (Aber sehr bewölkt!)";
-      } else if (cloud !== null && cloud < 25) {
-        $("mainRec").textContent += " (Wolken sehr gut!)";
-      }
+      if (cloud !== null && cloud > 80) $("mainRec").textContent += " (Aber sehr bewölkt!)";
+      else if (cloud !== null && cloud < 25) $("mainRec").textContent += " (Wolken sehr gut!)";
 
-      // 6) Chart update (FIXED: nulls + timestamp alignment)
+      // Chart
       renderChart(magData, plasmaData);
     }
 
@@ -309,8 +508,6 @@
       const labels = [], bzData = [], spdData = [];
 
       const speedMap = buildSpeedMap(plasma);
-
-      // take last 70 mag points; later we cut to 40 valid points
       const sliceMag = mag.slice(-70);
 
       for (let i = 0; i < sliceMag.length; i++) {
@@ -318,20 +515,15 @@
         if (!Array.isArray(row) || row.length < 4) continue;
 
         const iso = row[0];
-        const time = isoToHHMMSS(iso); // ✅ prevents duplicate labels
+        const time = isoToHHMMSS(iso);
         const bzVal = safeNum(row[3]);
-
-        // align speed by SAME timestamp (best effort)
         const spdVal = speedMap.has(iso) ? speedMap.get(iso) : null;
 
         labels.push(time);
-
-        // ✅ your proposed logic: keep point but null if invalid
         bzData.push(Number.isFinite(bzVal) ? bzVal : null);
         spdData.push(Number.isFinite(spdVal) ? spdVal : null);
       }
 
-      // keep last ~40 points for readability
       const cut = Math.max(0, labels.length - 40);
       const L = labels.slice(cut);
       const B = bzData.slice(cut);
@@ -343,26 +535,8 @@
         data: {
           labels: L,
           datasets: [
-            {
-              label: 'Bz (nT)',
-              data: B,
-              borderColor: '#3b82f6',
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.25,
-              yAxisID: 'y',
-              spanGaps: false   // ✅ do not connect across nulls
-            },
-            {
-              label: 'Speed (km/s)',
-              data: S,
-              borderColor: '#ef4444',
-              borderWidth: 2,
-              pointRadius: 0,
-              tension: 0.25,
-              yAxisID: 'y1',
-              spanGaps: false   // ✅ do not connect across nulls
-            }
+            { label: 'Bz (nT)', data: B, borderColor: '#3b82f6', borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: 'y', spanGaps: false },
+            { label: 'Speed (km/s)', data: S, borderColor: '#ef4444', borderWidth: 2, pointRadius: 0, tension: 0.25, yAxisID: 'y1', spanGaps: false }
           ]
         },
         options: {
@@ -371,26 +545,15 @@
           animation: false,
           plugins: { legend: { display: false } },
           scales: {
-            x: {
-              ticks: { color: 'rgba(255,255,255,0.45)', maxTicksLimit: 7 },
-              grid: { color: 'rgba(255,255,255,0.05)' }
-            },
-            y: {
-              position: 'left',
-              ticks: { color: 'rgba(255,255,255,0.45)' },
-              grid: { color: 'rgba(255,255,255,0.05)' }
-            },
-            y1: {
-              position: 'right',
-              ticks: { color: 'rgba(255,255,255,0.45)' },
-              grid: { display: false }
-            }
+            x: { ticks: { color: 'rgba(255,255,255,0.45)', maxTicksLimit: 7 }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y: { position: 'left', ticks: { color: 'rgba(255,255,255,0.45)' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+            y1:{ position: 'right', ticks: { color: 'rgba(255,255,255,0.45)' }, grid: { display: false } }
           }
         }
       });
     }
 
-    // Map init (dark tiles)
+    // ===== MAP =====
     function initMap() {
       map = L.map('map', { zoomControl: false }).setView([currentLat, currentLon], 10);
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -402,18 +565,301 @@
       marker = L.marker([currentLat, currentLon], { draggable: true }).addTo(map);
       marker.on('dragend', () => {
         const p = marker.getLatLng();
-        currentLat = p.lat;
-        currentLon = p.lng;
-        $("latText").textContent = currentLat.toFixed(2);
-        $("lonText").textContent = currentLon.toFixed(2);
-        update();
+        setLatLon(p.lat, p.lng, true);
       });
     }
 
-    $("btnUpdate").onclick = update;
+    function setLatLon(lat, lon, doUpdate=false) {
+      currentLat = lat;
+      currentLon = lon;
+      $("latText").textContent = currentLat.toFixed(2);
+      $("lonText").textContent = currentLon.toFixed(2);
+
+      if (marker) marker.setLatLng([currentLat, currentLon]);
+      if (map) map.setView([currentLat, currentLon], Math.max(map.getZoom(), 9));
+
+      updateMoonAndTwilight();
+      if (doUpdate) updateAll();
+    }
+
+    // ===== LOCATION SEARCH (FIXED) =====
+    let acTimer = null;
+    let acItems = [];
+    let acOpen = false;
+
+    function openAC(list) {
+      const box = $("acList");
+      box.innerHTML = "";
+      if (!list || !list.length) { box.style.display = "none"; acOpen = false; return; }
+
+      list.slice(0,6).forEach((it, idx) => {
+        const div = document.createElement("div");
+        div.className = "ac-item";
+        div.innerHTML = `
+          <div class="font-semibold">${escapeHtml(it.name)}</div>
+          <div class="ac-sub">${escapeHtml(it.display)}</div>
+        `;
+        div.onclick = () => selectAC(idx);
+        box.appendChild(div);
+      });
+      box.style.display = "block";
+      acOpen = true;
+    }
+
+    function closeAC() {
+      $("acList").style.display = "none";
+      acOpen = false;
+    }
+
+    function escapeHtml(s) {
+      return String(s || "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    async function searchPlaces(q) {
+      if (!q || q.trim().length < 3) { openAC([]); return; }
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&addressdetails=1&q=${encodeURIComponent(q)}`;
+      const data = await fetchJson(url, 9000);
+      if (!data || !Array.isArray(data)) { openAC([]); return; }
+
+      acItems = data.map(x => {
+        const name = (x.display_name || "").split(",")[0] || "Ort";
+        return {
+          name,
+          display: x.display_name || "",
+          lat: parseFloat(x.lat),
+          lon: parseFloat(x.lon)
+        };
+      }).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lon));
+
+      openAC(acItems);
+    }
+
+    function selectAC(idx) {
+      const it = acItems[idx];
+      if (!it) return;
+      $("placeInput").value = it.display;
+      closeAC();
+      setLatLon(it.lat, it.lon, true);
+    }
+
+    function wireAutocomplete() {
+      const input = $("placeInput");
+      input.addEventListener("input", () => {
+        clearTimeout(acTimer);
+        acTimer = setTimeout(() => searchPlaces(input.value), 280);
+      });
+
+      input.addEventListener("focus", () => {
+        if (acItems.length) openAC(acItems);
+      });
+
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (acOpen && acItems.length) selectAC(0);
+          else searchPlaces(input.value).then(() => { if (acItems.length) selectAC(0); });
+        }
+        if (e.key === "Escape") closeAC();
+      });
+
+      document.addEventListener("click", (e) => {
+        if (!e.target.closest(".ac-wrap")) closeAC();
+      });
+    }
+
+    // ===== GPS BUTTON =====
+    function wireGPS() {
+      $("btnGPS").onclick = () => {
+        if (!navigator.geolocation) return;
+        $("statusBadge").textContent = "GPS…";
+        navigator.geolocation.getCurrentPosition(pos => {
+          setLatLon(pos.coords.latitude, pos.coords.longitude, true);
+        }, () => {
+          // If user blocks, just revert badge on next update
+          updateAll();
+        }, { enableHighAccuracy: true, timeout: 10000 });
+      };
+    }
+
+    // ===== MOON + TWILIGHT (App cards) =====
+    function moonPhaseName(phase01) {
+      // SunCalc: phase 0..1 (0=new, 0.25=first quarter, 0.5=full, 0.75=last quarter)
+      const p = phase01;
+      if (p < 0.03 || p > 0.97) return "Neumond";
+      if (p < 0.22) return "Zunehmende Sichel";
+      if (p < 0.28) return "Erstes Viertel";
+      if (p < 0.47) return "Zunehmender Mond";
+      if (p < 0.53) return "Vollmond";
+      if (p < 0.72) return "Abnehmender Mond";
+      if (p < 0.78) return "Letztes Viertel";
+      return "Abnehmende Sichel";
+    }
+
+    function twilightStateLabel(altDeg) {
+      // Sun altitude thresholds
+      if (altDeg > 0) return { pill: "Tag", badge:"Tag" };
+      if (altDeg > -6) return { pill: "Bürgerlich", badge:"Dämmerung" };
+      if (altDeg > -12) return { pill: "Nautisch", badge:"Dämmerung" };
+      if (altDeg > -18) return { pill: "Astronomisch", badge:"Dämmerung" };
+      return { pill: "Nacht", badge:"Nacht" };
+    }
+
+    function updateMoonAndTwilight() {
+      const lat = currentLat, lon = currentLon;
+      const now = new Date();
+
+      // Sun times: use today for dusk, tomorrow for dawn (morning)
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+      const sunToday = SunCalc.getTimes(today, lat, lon);
+      const sunTom   = SunCalc.getTimes(tomorrow, lat, lon);
+
+      // Dusk: today's sunset/dusk
+      $("sunset").textContent = fmtTime(sunToday.sunset);
+      $("duskCivil").textContent = fmtTime(sunToday.dusk);           // civil dusk
+      $("duskNautical").textContent = fmtTime(sunToday.nauticalDusk);
+      $("duskAstro").textContent = fmtTime(sunToday.night);          // astronomical dusk (~sun -18)
+
+      // Dawn: tomorrow's sunrise/dawn
+      $("sunrise").textContent = fmtTime(sunTom.sunrise);
+      $("dawnCivil").textContent = fmtTime(sunTom.dawn);             // civil dawn
+      $("dawnNautical").textContent = fmtTime(sunTom.nauticalDawn);
+      $("dawnAstro").textContent = fmtTime(sunTom.nightEnd);         // astronomical dawn end
+
+      // Current sun altitude -> state + timeline dot
+      const sunPos = SunCalc.getPosition(now, lat, lon);
+      const altDeg = sunPos.altitude * (180/Math.PI);
+      const st = twilightStateLabel(altDeg);
+      $("twPill").textContent = st.pill;
+      $("twState").textContent = st.badge;
+
+      // Dot position: map altitude range [-18..+3] into [140..10]
+      const clamped = Math.max(-18, Math.min(3, altDeg));
+      const t = (clamped + 18) / (21); // 0..1
+      const topPx = 140 - t * 120;     // ~140..20
+      $("twDot").style.top = `${topPx}px`;
+
+      // Moon info
+      const illum = SunCalc.getMoonIllumination(now);
+      const illumPct = Math.round((illum.fraction || 0) * 100);
+      const phase = moonPhaseName(illum.phase || 0);
+
+      const mt = SunCalc.getMoonTimes(now, lat, lon, true); // in UTC? SunCalc returns local Date objects
+      // Some locations/days can return alwaysUp/alwaysDown
+      $("moonRise").textContent = mt.rise ? fmtTime(mt.rise) : (mt.alwaysUp ? "Immer oben" : "--:--");
+      $("moonSet").textContent  = mt.set  ? fmtTime(mt.set)  : (mt.alwaysDown ? "Immer unten" : "--:--");
+      $("moonIllum").textContent = illumPct;
+      $("moonPhase").textContent = phase;
+      $("moonBadge").textContent = `Beleuchtung ${illumPct}%`;
+
+      // Draw moon curve (illumination over next 24h)
+      drawMoonCurve(lat, lon);
+
+      return { illumPct };
+    }
+
+    function drawMoonCurve(lat, lon) {
+      const c = $("moonCurve");
+      const ctx = c.getContext("2d");
+
+      // make canvas crisp
+      const rect = c.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      c.width = Math.floor(rect.width * dpr);
+      c.height = Math.floor(rect.height * dpr);
+      ctx.setTransform(dpr,0,0,dpr,0,0);
+
+      const w = rect.width, h = rect.height;
+      ctx.clearRect(0,0,w,h);
+
+      // baseline
+      ctx.strokeStyle = "rgba(255,255,255,0.18)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(10, h/2);
+      ctx.lineTo(w-10, h/2);
+      ctx.stroke();
+
+      // dots
+      const now = new Date();
+      const points = 18;
+      const xs = [];
+      const ys = [];
+      for (let i=0;i<points;i++){
+        const t = -9 + (18*(i/(points-1))); // hours from now: -9..+9
+        const d = new Date(now.getTime() + t*3600*1000);
+        const frac = (SunCalc.getMoonIllumination(d).fraction || 0); // 0..1
+        const x = 12 + (w-24)*(i/(points-1));
+        const y = (h-14) - frac*(h-22); // higher = more illum
+        xs.push(x); ys.push(y);
+      }
+
+      // curve
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i=0;i<points;i++){
+        if (i===0) ctx.moveTo(xs[i], ys[i]);
+        else ctx.lineTo(xs[i], ys[i]);
+      }
+      ctx.stroke();
+
+      // dots
+      ctx.fillStyle = "rgba(255,255,255,0.55)";
+      for (let i=0;i<points;i++){
+        ctx.beginPath();
+        ctx.arc(xs[i], ys[i], 2.1, 0, Math.PI*2);
+        ctx.fill();
+      }
+
+      // "now" marker on right (like app)
+      ctx.fillStyle = "rgba(245,158,11,0.9)";
+      ctx.beginPath();
+      ctx.arc(w-16, ys[points-1], 4.2, 0, Math.PI*2);
+      ctx.fill();
+      ctx.shadowColor = "rgba(245,158,11,0.55)";
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    // ===== TABS =====
+    function wireTabs() {
+      const tabs = Array.from(document.querySelectorAll(".tab"));
+      tabs.forEach(t => {
+        t.addEventListener("click", () => {
+          tabs.forEach(x => x.classList.remove("active"));
+          t.classList.add("active");
+          const id = t.getAttribute("data-target");
+          const el = document.getElementById(id);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      });
+    }
+
+    // ===== INIT =====
+    $("btnUpdate").onclick = updateAll;
+
     initMap();
-    update();
-    setInterval(update, 60000);
+    wireAutocomplete();
+    wireGPS();
+    wireTabs();
+
+    // initial
+    setLatLon(currentLat, currentLon, false);
+    updateAll();
+    setInterval(updateAll, 60000);
+
+    // redraw moon curve on resize
+    window.addEventListener("resize", () => {
+      drawMoonCurve(currentLat, currentLon);
+    });
   </script>
 </body>
 </html>
