@@ -3,742 +3,417 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AURORA X — Live Entscheidung</title>
+  <title>AURORA X — Robuste Version (v8)</title>
 
   <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-
-  <!-- Chart.js -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
     :root{ --bg:#050505; }
-    body{ background:var(--bg); color:#fff; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+    body{ background:var(--bg); color:#fff; font-family: ui-sans-serif, system-ui, -apple-system; }
+    .mono{ font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
 
     .glass{
-      background: radial-gradient(1200px 500px at 20% -10%, rgba(34,197,94,.20), transparent 55%),
-                  radial-gradient(900px 450px at 90% 0%, rgba(59,130,246,.18), transparent 55%),
-                  linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      background:
+        radial-gradient(1200px 500px at 20% -10%, rgba(34,197,94,.15), transparent 55%),
+        linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
       border:1px solid rgba(255,255,255,.08);
-      box-shadow: 0 30px 80px rgba(0,0,0,.55);
       backdrop-filter: blur(10px);
     }
+
     .card{
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.025));
+      background: rgba(255,255,255,.03);
       border:1px solid rgba(255,255,255,.08);
       border-radius: 18px;
-      box-shadow: 0 18px 55px rgba(0,0,0,.55);
+      box-shadow: 0 18px 55px rgba(0,0,0,.35);
     }
+
     .badge{
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.25);
+      border:1px solid rgba(255,255,255,.1);
+      background: rgba(0,0,0,.3);
       border-radius:999px;
-      padding:.25rem .55rem;
+      padding:.2rem .5rem;
       font-size:10px;
-      letter-spacing:.2em;
+      letter-spacing:.12em;
       text-transform: uppercase;
       color: rgba(255,255,255,.65);
       white-space: nowrap;
     }
-    .glow-red{ color:#ef4444; text-shadow: 0 0 25px rgba(239, 68, 68, .55); }
-    .glow-yellow{ color:#f59e0b; text-shadow: 0 0 25px rgba(245, 158, 11, .45); }
-    .glow-green{ color:#22c55e; text-shadow: 0 0 25px rgba(34, 197, 94, .50); }
 
-    .btn{
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(255,255,255,.06);
-      transition: transform .12s ease, background .12s ease;
-    }
-    .btn:hover{ transform: translateY(-1px); background: rgba(255,255,255,.10); }
-    .btn-primary{
-      background: rgba(34,197,94,.85);
-      border-color: rgba(34,197,94,.35);
-      color:#06210f;
-    }
-    .btn-primary:hover{ background: rgba(34,197,94,.95); }
+    .glow-red{ color:#ef4444; text-shadow: 0 0 20px rgba(239, 68, 68, .5); }
+    .glow-yellow{ color:#f59e0b; text-shadow: 0 0 20px rgba(245, 158, 11, .4); }
+    .glow-green{ color:#22c55e; text-shadow: 0 0 20px rgba(34, 197, 94, .4); }
+
+    .btn-primary{ background: #22c55e; color:#052e16; font-weight: 800; }
+    .btn-primary:hover{ filter: brightness(1.05); }
 
     .input{
-      background: rgba(0,0,0,.35);
-      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.5);
+      border:1px solid rgba(255,255,255,.1);
       border-radius: 10px;
-      padding: 10px 12px;
+      padding: 8px 12px;
       color: #fff;
       outline: none;
     }
-    .input:focus{ border-color: rgba(34,197,94,.45); box-shadow: 0 0 0 4px rgba(34,197,94,.12); }
 
-    /* charts: fixed height, no infinite grow */
-    .chart-wrap{ height: 190px; width:100%; position:relative; }
-    @media (min-width: 768px){ .chart-wrap{ height: 220px; } }
-    .chart-wrap.kp{ height: 170px; }
+    #map{
+      height: 210px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.1);
+      overflow:hidden;
+    }
+
+    .chart-wrap{
+      height: 200px;
+      width:100%;
+      position:relative;
+    }
+
+    /* Fix: prevents the “chart grows longer and longer” bug on some mobiles */
     canvas{
       width:100% !important;
       height:100% !important;
       display:block;
-      background: rgba(0,0,0,.15);
-      border:1px solid rgba(255,255,255,.06);
-      border-radius: 16px;
     }
-
-    #map{ height: 220px; border-radius: 16px; overflow:hidden; border:1px solid rgba(255,255,255,.08); }
-
-    .ov-wrap{ position:relative; border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.08); }
-    .ov-overlay{
-      position:absolute; inset:auto 10px 10px 10px;
-      display:flex; gap:8px; flex-wrap:wrap; align-items:center; justify-content:space-between;
-    }
-    .tiny{ font-size:11px; color: rgba(255,255,255,.65); }
-    a{ color: rgba(255,255,255,.75); }
-    a:hover{ color:#fff; }
   </style>
 </head>
 
-<body class="p-4 md:p-8">
-  <div class="max-w-3xl mx-auto">
+<body class="p-4">
+  <div class="max-w-2xl mx-auto">
 
     <!-- Header -->
-    <div class="glass rounded-2xl p-4 md:p-5 mb-4">
-      <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div class="glass rounded-2xl p-5 mb-4">
+      <div class="flex justify-between items-start mb-4">
         <div>
-          <div class="flex items-baseline gap-2">
-            <h1 class="text-xl md:text-2xl font-black tracking-tight">AURORA <span class="text-green-400">X</span></h1>
-            <span class="badge" id="dataBadge">LIVE</span>
-          </div>
-          <div class="text-[11px] text-white/55 uppercase tracking-[0.25em] mt-1">
-            Entscheidung für „Geh ich raus oder nicht?“
-          </div>
-          <div id="locationStatus" class="text-[11px] text-white/55 mt-2">Standort: <span class="text-white/80">Chemnitz</span></div>
-        </div>
-
-        <div class="w-full md:w-[56%]">
-          <div class="flex gap-2">
-            <input id="placeInput" class="input w-full text-sm" placeholder="Ort suchen (z. B. Chemnitz, Erzgebirge, …)" autocomplete="off">
-            <button class="btn btn-primary px-4 rounded-xl text-xs font-bold uppercase" id="btnUpdate">Update</button>
-            <button class="btn px-3 rounded-xl" id="btnGPS" title="Meinen Standort nutzen">📍</button>
-          </div>
-
-          <div id="suggestions" class="mt-2 hidden card p-2"></div>
-
-          <div class="mt-2 flex items-center justify-between text-[10px] text-white/45 uppercase tracking-widest">
-            <div>Lat: <span id="latText" class="text-white/70 mono">50.83</span> • Lon: <span id="lonText" class="text-white/70 mono">12.92</span></div>
-            <div>Letztes Update: <span id="updatedAt" class="text-white/70 mono">--:--</span></div>
+          <h1 class="text-xl font-black">AURORA <span class="text-green-400">X</span></h1>
+          <div class="flex items-center gap-2 mt-2">
+            <span class="badge" id="statusBadge">CHECKING…</span>
+            <span class="badge">Lat: <span class="mono" id="latText">50.83</span></span>
+            <span class="badge">Lon: <span class="mono" id="lonText">12.92</span></span>
           </div>
         </div>
+        <div class="text-right text-[10px] text-white/40 mono">
+          <div>Letztes Update</div>
+          <div id="updateTime">--:--</div>
+        </div>
+      </div>
+
+      <div class="flex gap-2">
+        <input id="placeInput" class="input flex-grow text-sm" placeholder="Ort suchen… (optional)">
+        <button class="btn-primary px-4 py-2 rounded-xl text-xs" id="btnUpdate">UPDATE</button>
+      </div>
+
+      <div class="text-[11px] text-white/45 mt-3">
+        Tipp: Zieh den Pin auf einen dunkleren Spot außerhalb der Stadt und prüf dort Wolken.
       </div>
     </div>
 
-    <!-- ✅ MAP DIRECTLY UNDER LOCATION (makes more sense) -->
-    <div class="card p-4 mb-6">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Standort-Pin ziehen</div>
-        <div class="badge">draggable</div>
+    <!-- Map directly under header (as you wanted) -->
+    <div class="card p-4 mb-4">
+      <div class="flex justify-between items-center mb-3">
+        <div class="text-[10px] text-white/40 font-bold uppercase tracking-widest">Standort-Pin (draggable)</div>
+        <span class="badge">Night Map</span>
       </div>
       <div id="map"></div>
-      <div class="text-[11px] text-white/55 mt-3">Tipp: Zieh den Pin aufs Land raus (dunkler) und check Wolken dort.</div>
     </div>
 
-    <!-- Main decision -->
-    <div class="card p-6 text-center mb-6">
-      <div class="badge inline-block mb-4">Wahrscheinlichkeit</div>
-      <div id="mainStatus" class="text-5xl md:text-6xl font-black tracking-tight mono text-white/25">ANALYSE</div>
-      <p id="mainRec" class="text-sm md:text-base text-white/60 italic mt-4 px-2">Verbinde mit Satelliten-Daten…</p>
+    <!-- Decision -->
+    <div class="card p-8 text-center mb-4">
+      <div id="mainStatus" class="text-6xl font-black tracking-tighter mb-2 text-white/20">ANALYSE</div>
+      <p id="mainRec" class="text-sm text-white/50 italic">Daten werden abgefragt…</p>
 
-      <div class="mt-5 flex flex-wrap justify-center gap-2 text-[11px] text-white/60">
-        <span class="badge">Bz: <span id="bzChip" class="text-white/80 mono">--</span></span>
-        <span class="badge">Speed: <span id="spdChip" class="text-white/80 mono">--</span></span>
-        <span class="badge">Kp: <span id="kpChip" class="text-white/80 mono">--</span></span>
-        <span class="badge">Wolken: <span id="cloudChip" class="text-white/80 mono">--</span></span>
-        <span class="badge">Mond: <span id="moonChip" class="text-white/80 mono">--</span></span>
+      <div class="flex flex-wrap justify-center gap-2 mt-6">
+        <span class="badge">Bz: <span id="chipBz" class="mono">--</span></span>
+        <span class="badge">Spd: <span id="chipSpd" class="mono">--</span></span>
+        <span class="badge">Kp: <span id="chipKp" class="mono">--</span></span>
+        <span class="badge">Cloud: <span id="chipCloud" class="mono">--</span></span>
       </div>
     </div>
 
-    <!-- Stats -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+    <!-- Small cards -->
+    <div class="grid grid-cols-2 gap-3 mb-4">
       <div class="card p-4">
-        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-2">Magnetfeld (Bz)</div>
-        <div class="text-3xl font-black mono" id="bzVal">--</div>
-        <div class="mt-3 h-2 bg-white/10 rounded-full overflow-hidden">
-          <div id="bzBar" class="h-full bg-blue-500" style="width:50%"></div>
-        </div>
-        <div class="text-[11px] text-white/55 mt-3">Je negativer (südlicher), desto besser fürs Oval.</div>
+        <div class="text-[10px] text-white/40 uppercase font-bold mb-1">Sonnenwind</div>
+        <div class="text-2xl font-bold mono" id="valSpd">--</div>
+        <div class="text-[10px] text-white/30 italic">km/s</div>
       </div>
-
       <div class="card p-4">
-        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-2">Sonnenwind Speed</div>
-        <div class="text-3xl font-black mono"><span id="speedVal">--</span> <span class="text-base text-white/40">km/s</span></div>
-        <div class="text-[11px] text-white/55 mt-3">Hohe Speed + negativer Bz = „Chef’s Kiss“.</div>
-      </div>
-
-      <div class="card p-4">
-        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-2">Wetter & Mond</div>
-        <div class="text-3xl font-black mono" id="cloudVal">--</div>
-        <div class="text-[11px] text-white/70 mt-2" id="moonVal">Mond: --</div>
-        <div class="text-[11px] text-white/55 mt-2">Wolken killen alles – Mond ist „Lichtverschmutzung deluxe“.</div>
+        <div class="text-[10px] text-white/40 uppercase font-bold mb-1">Magnetfeld</div>
+        <div class="text-2xl font-bold mono" id="valBz">--</div>
+        <div class="text-[10px] text-white/30 italic">nT (Süd-Ausrichtung)</div>
       </div>
     </div>
 
-    <!-- OVATION -->
-    <div class="card p-4 mb-6">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">OVATION Aurora Oval (NOAA, 30–90 min)</div>
-        <div class="badge">OVATION</div>
+    <!-- Chart -->
+    <div class="card p-4 mb-4">
+      <div class="flex justify-between items-center mb-3">
+        <div class="text-[10px] text-white/40 font-bold uppercase tracking-widest">Bz & Speed Verlauf (letzte ~60 Min)</div>
+        <span class="badge">Filtered • aligned</span>
       </div>
-      <div class="ov-wrap">
-        <img id="ovationImg" alt="NOAA Ovation Aurora Forecast" class="w-full block"
-             src="https://services.swpc.noaa.gov/images/animations/ovation-north/latest.jpg">
-        <div class="ov-overlay">
-          <span class="badge">Live Map</span>
-          <span class="badge">Refresh: <span id="ovTime" class="mono">--:--</span></span>
-        </div>
-      </div>
-      <div class="mt-3 tiny">Oval = grobe Nowcast-Wahrscheinlichkeit. Praxis bleibt: Bz + Speed + Wolken + dunkler Spot.</div>
-    </div>
-
-    <!-- Graphs -->
-    <div class="grid grid-cols-1 gap-4 mb-6">
-      <div class="card p-4">
-        <div class="flex items-center justify-between mb-3">
-          <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Bz & Speed (letzte Stunden)</div>
-          <div class="badge">NOAA tables • filtered</div>
-        </div>
-        <div class="chart-wrap">
-          <canvas id="chartBzSpeed"></canvas>
-        </div>
-      </div>
-
-      <div class="card p-4">
-        <div class="flex items-center justify-between mb-3">
-          <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold">Kp Index (letzte 24h)</div>
-          <div class="badge">NOAA Kp</div>
-        </div>
-        <div class="chart-wrap kp">
-          <canvas id="chartKp"></canvas>
-        </div>
-      </div>
-    </div>
-
-    <!-- Links -->
-    <div class="card p-4">
-      <div class="text-[10px] uppercase tracking-[0.25em] text-white/45 font-bold mb-3">Praktische Links</div>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.swpc.noaa.gov/">NOAA Space Weather (SWPC)</a>
-        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://services.swpc.noaa.gov/products/">NOAA Data Products (JSON)</a>
-        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.spaceweatherlive.com/">SpaceWeatherLive (Übersicht)</a>
-        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.lightpollutionmap.info/">Light Pollution Map (Dunkle Spots)</a>
-        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.windy.com/">Windy (Wolken/Modelle)</a>
-        <a class="btn rounded-xl px-3 py-2" target="_blank" rel="noopener" href="https://www.cleardarksky.com/">Clear Dark Sky (Astro)</a>
-      </div>
-      <div class="text-[9px] text-white/30 uppercase tracking-[0.4em] font-bold mt-6 text-center">
-        Aurora X • tables aligned by timestamp • v7
+      <div class="chart-wrap">
+        <canvas id="chartMain"></canvas>
       </div>
     </div>
 
   </div>
 
   <script>
-    let currentLat = 50.83;
-    let currentLon = 12.92;
-    let map, marker, tileLayer;
-    let chartBzSpeed, chartKp;
+    let currentLat = 50.83, currentLon = 12.92;
+    let chartMain = null;
+    let map, marker;
 
-    const $ = (id) => document.getElementById(id);
+    const $ = id => document.getElementById(id);
 
-    function nowHHMM(){
-      return new Date().toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"});
+    function nowHHMM() {
+      return new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
     }
-    function safeNum(x){
+
+    function safeNum(x) {
       const n = parseFloat(x);
       return Number.isFinite(n) ? n : null;
     }
-    function clamp(n, min, max){ return Math.max(min, Math.min(max, n)); }
 
-    // ✅ use seconds to avoid duplicate X labels (fixes vertical stripes)
-    function toHHMMSSfromISO(iso){
-      if(!iso) return "";
-      const t = iso.split(" ")[1] || "";
-      return t.slice(0,8); // HH:MM:SS
-    }
-    function toHHMMfromISO(iso){
-      if(!iso) return "";
-      const t = iso.split(" ")[1] || "";
-      return t.slice(0,5);
-    }
-
-    async function fetchJson(url, timeoutMs=12000){
+    async function fetchJson(url, timeoutMs = 12000) {
       const controller = new AbortController();
-      const t = setTimeout(()=>controller.abort(), timeoutMs);
-      try{
-        const res = await fetch(url, {cache:"no-store", signal: controller.signal});
-        if(!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+        if (!res.ok) return null;
         return await res.json();
-      } finally { clearTimeout(t); }
-    }
-
-    // Moon (local)
-    function moonInfo(date=new Date()){
-      const knownNewMoon = Date.UTC(2000,0,6,18,14,0);
-      const synodicMonth = 29.530588853;
-      const days = (date.getTime()-knownNewMoon)/86400000;
-      const phase = (days % synodicMonth + synodicMonth) % synodicMonth;
-      const frac = phase/synodicMonth;
-      const illumination = (1 - Math.cos(2*Math.PI*frac))/2;
-      const illumPct = Math.round(illumination*100);
-
-      let name="Neumond", emoji="🌑";
-      if (frac < 0.03 || frac > 0.97) { name="Neumond"; emoji="🌑"; }
-      else if (frac < 0.22) { name="Zunehmend"; emoji="🌒"; }
-      else if (frac < 0.28) { name="Erstes Viertel"; emoji="🌓"; }
-      else if (frac < 0.47) { name="Zunehmend"; emoji="🌔"; }
-      else if (frac < 0.53) { name="Vollmond"; emoji="🌕"; }
-      else if (frac < 0.72) { name="Abnehmend"; emoji="🌖"; }
-      else if (frac < 0.78) { name="Letztes Viertel"; emoji="🌗"; }
-      else { name="Abnehmend"; emoji="🌘"; }
-
-      const penalty = illumPct >= 70 ? "hell" : (illumPct >= 35 ? "mittel" : "dunkel");
-      return { illumPct, name, emoji, penalty };
-    }
-
-    // UI
-    function setDecisionUI(level, rec){
-      const el = $("mainStatus");
-      const recEl = $("mainRec");
-      el.className = "text-5xl md:text-6xl font-black tracking-tight mono";
-      if(level==="ALARM"){ el.textContent="ALARM"; el.classList.add("glow-red"); }
-      else if(level==="CHANCE"){ el.textContent="CHANCE"; el.classList.add("glow-yellow"); }
-      else if(level==="WATCH"){ el.textContent="WATCH"; el.classList.add("glow-green"); }
-      else { el.textContent="RUHIG"; el.classList.add("text-white/25"); }
-      recEl.textContent = rec || "—";
-    }
-
-    function setBzBar(bz){
-      const bar = $("bzBar");
-      if(bz===null){
-        bar.style.width="50%";
-        bar.className="h-full bg-blue-500";
-        return;
+      } catch {
+        return null;
+      } finally {
+        clearTimeout(t);
       }
-      const pct = Math.round(((clamp(bz,-20,20)+20)/40)*100);
-      bar.style.width = pct + "%";
-      bar.className="h-full";
-      if(bz<=-12) bar.classList.add("bg-red-500");
-      else if(bz<=-5) bar.classList.add("bg-yellow-500");
-      else if(bz<=0) bar.classList.add("bg-blue-500");
-      else bar.classList.add("bg-green-500");
     }
 
-    function cloudText(cloud){
-      if(cloud===null) return {label:"--", chip:"--"};
-      if(cloud>=80) return {label:`☁️ ${cloud}%`, chip:`${cloud}%`};
-      if(cloud>=35) return {label:`⛅ ${cloud}%`, chip:`${cloud}%`};
-      return {label:`🌙 ${cloud}%`, chip:`${cloud}%`};
-    }
-
-    // Data
-    async function fetchSolarWindSummary(){
-      const mag = await fetchJson("https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json", 8000);
-      const spd = await fetchJson("https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json", 8000);
-      return { bz: safeNum(mag?.bz), speed: safeNum(spd?.wind_speed), time: mag?.time_tag || spd?.time_tag || null };
-    }
-
-    function lastValidRow(table, valueIndex){
-      if(!Array.isArray(table) || table.length < 2) return null;
-      for(let i = table.length - 1; i >= 1; i--){
-        const row = table[i];
-        if(!Array.isArray(row) || row.length <= valueIndex) continue;
-        const v = safeNum(row[valueIndex]);
-        if(v !== null) return row;
+    // Robust: scan backwards until you find a finite number
+    function findLastValid(data, index) {
+      if (!data || !Array.isArray(data) || data.length < 2) return null;
+      for (let i = data.length - 1; i >= 1; i--) {
+        const row = data[i];
+        if (!Array.isArray(row) || row.length <= index) continue;
+        const val = safeNum(row[index]);
+        if (val !== null) return { val, time: row[0] };
       }
       return null;
     }
 
-    async function fetchSolarWindTables(){
-      const mag = await fetchJson("https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json", 12000);
-      const plasma = await fetchJson("https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json", 12000);
-      return { mag, plasma };
-    }
-
-    async function fetchKpRobust(){
-      const kp = await fetchJson("https://services.swpc.noaa.gov/products/noaa-planetary-k-index-1-day.json", 12000);
-      const kpLast = lastValidRow(kp, 1);
-      const fallback = (kp.length > 2 && Array.isArray(kp[kp.length-2])) ? safeNum(kp[kp.length-2][1]) : null;
-      const kpVal = kpLast ? safeNum(kpLast[1]) : fallback;
-      const kpTime = kpLast ? kpLast[0] : (kp.length > 2 ? kp[kp.length-2][0] : null);
-
-      const trend = [];
-      for(let i=kp.length-1; i>=1 && trend.length<24; i--){
-        const row = kp[i];
-        if(!Array.isArray(row) || row.length<2) continue;
-        const v = safeNum(row[1]);
-        if(v===null) continue;
-        trend.push([row[0], v]);
+    // Build timestamp->speed map for alignment (NO index-matching!)
+    function buildSpeedMap(plasma) {
+      const m = new Map();
+      if (!plasma || !Array.isArray(plasma)) return m;
+      for (let i = 1; i < plasma.length; i++) {
+        const row = plasma[i];
+        if (!Array.isArray(row) || row.length < 3) continue;
+        const t = row[0];
+        const spd = safeNum(row[2]);
+        m.set(t, spd);
       }
-      trend.reverse();
-      return { kpVal, kpTime, kpTrend: trend };
+      return m;
     }
 
-    async function fetchCloud(lat, lon){
-      try{
-        const wx = await fetchJson(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=cloud_cover`, 9000);
-        const cloud = wx?.current?.cloud_cover;
-        return (typeof cloud==="number" && Number.isFinite(cloud)) ? cloud : null;
-      } catch { return null; }
+    function isoToHHMMSS(iso) {
+      if (!iso) return "";
+      const t = (iso.split(" ")[1] || "");
+      return t.slice(0, 8); // HH:MM:SS (prevents duplicate x labels)
     }
 
-    // Ovation (with fallback)
-    function updateOvationPanel(){
-      const t = Date.now();
-      const img = $("ovationImg");
-      $("ovTime").textContent = nowHHMM();
-
-      const primary = `https://services.swpc.noaa.gov/images/animations/ovation-north/latest.jpg?cb=${t}`;
-      const fallback = `https://services.swpc.noaa.gov/images/animations/ovation-north/latest.png?cb=${t}`;
-
-      img.onerror = () => { img.onerror = null; img.src = fallback; };
-      img.src = primary;
+    function setBadge(mode) {
+      const b = $("statusBadge");
+      b.className = "badge";
+      if (mode === "LIVE") b.textContent = "LIVE";
+      else if (mode === "DEGRADED") b.textContent = "DEGRADED";
+      else if (mode === "OFFLINE") b.textContent = "OFFLINE";
+      else b.textContent = "CHECKING…";
     }
 
-    // Decision
-    function computeDecision({bz, speed, kpVal, cloud, moonPenalty}){
-      const bzStrong = (bz!==null && bz<=-12);
-      const bzOk = (bz!==null && bz<=-5);
-      const spdStrong = (speed!==null && speed>=550);
-      const spdOk = (speed!==null && speed>=450);
-      const kpStrong = (kpVal!==null && kpVal>=7);
-      const kpOk = (kpVal!==null && kpVal>=5);
-      const cloudBad = (cloud!==null && cloud>=85);
+    function setMainStatus(level, text) {
+      const el = $("mainStatus");
+      el.className = "text-6xl font-black tracking-tighter mb-2";
+      if (level === "ALARM") { el.textContent = "ALARM"; el.classList.add("glow-red"); }
+      else if (level === "CHANCE") { el.textContent = "CHANCE"; el.classList.add("glow-yellow"); }
+      else if (level === "WATCH") { el.textContent = "WATCH"; el.classList.add("glow-green"); }
+      else { el.textContent = "RUHIG"; el.classList.add("text-white/20"); }
+      $("mainRec").textContent = text || "";
+    }
 
-      const moonMsg = moonPenalty==="hell" ? "Mond hell (kontrastarm)" : (moonPenalty==="mittel" ? "Mond mittel" : "Mond dunkel (top)");
+    async function update() {
+      setBadge("CHECK");
+      $("updateTime").textContent = nowHHMM();
 
-      if (bzStrong && spdStrong && (kpOk || kpStrong)){
-        return { level:"ALARM", rec: cloudBad ? `Werte brutal gut – aber Wolken dick. ${moonMsg}.` : `RAUS! Sehr starke Bedingungen. ${moonMsg}.` };
+      // 1) Pull feeds in parallel
+      const [magData, plasmaData, kpData] = await Promise.all([
+        fetchJson("https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json", 15000),
+        fetchJson("https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json", 15000),
+        fetchJson("https://services.swpc.noaa.gov/products/noaa-planetary-k-index-1-day.json", 15000)
+      ]);
+
+      // 2) Extract last valid values
+      const bzObj = findLastValid(magData, 3);
+      const spdObj = findLastValid(plasmaData, 2);
+      const kpObj = findLastValid(kpData, 1);
+
+      const bz = bzObj ? bzObj.val : null;
+      const spd = spdObj ? spdObj.val : null;
+      const kp  = kpObj  ? kpObj.val  : null;
+
+      // 3) Weather (cloud cover)
+      let cloud = null;
+      const wx = await fetchJson(`https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLon}&current=cloud_cover`, 10000);
+      if (wx && wx.current && Number.isFinite(wx.current.cloud_cover)) cloud = wx.current.cloud_cover;
+
+      // 4) UI update
+      $("valBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
+      $("valSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
+
+      $("chipBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
+      $("chipSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
+      $("chipKp").textContent  = (kp !== null)  ? kp.toFixed(1) : "--";
+      $("chipCloud").textContent = (cloud !== null) ? `${cloud}%` : "--";
+
+      const hasAny = (bz !== null) || (spd !== null) || (kp !== null) || (cloud !== null);
+      const hasCore = (bz !== null) && (spd !== null); // your core decision data
+
+      if (!hasAny) setBadge("OFFLINE");
+      else if (!hasCore) setBadge("DEGRADED");
+      else setBadge("LIVE");
+
+      // 5) Decision logic (safe)
+      if (bz !== null && spd !== null && bz <= -10 && spd >= 500) {
+        setMainStatus("ALARM", "Hervorragende Werte! Geh raus (Norden, Langzeitbelichtung).");
+      } else if ((bz !== null && bz <= -4) || (kp !== null && kp >= 4)) {
+        setMainStatus("CHANCE", "Beobachten! Es tut sich was. Check auch OVATION + Magnetometer.");
+      } else if (bz !== null || spd !== null || kp !== null) {
+        setMainStatus("RUHIG", "Aktuell keine signifikante Aktivität.");
+      } else {
+        setMainStatus("RUHIG", "Keine Daten (Feed/Netzwerk). Refresh probieren.");
       }
-      if (bzOk && spdOk && kpOk){
-        return { level:"CHANCE", rec: cloudBad ? `Aktivität gut, aber wolkig. ${moonMsg}.` : `Gute Chance. ${moonMsg}.` };
+
+      if (cloud !== null && cloud > 80) {
+        $("mainRec").textContent += " (Aber sehr bewölkt!)";
+      } else if (cloud !== null && cloud < 25) {
+        $("mainRec").textContent += " (Wolken sehr gut!)";
       }
-      if ((bzOk && spdOk) || (kpStrong && bzOk)){
-        return { level:"WATCH", rec: cloudBad ? `Werte interessant, aber Wolken. ${moonMsg}.` : `Watch: möglich, wenn es weiter anzieht. ${moonMsg}.` };
+
+      // 6) Chart update (FIXED: nulls + timestamp alignment)
+      renderChart(magData, plasmaData);
+    }
+
+    function renderChart(mag, plasma) {
+      if (!mag || !plasma || !Array.isArray(mag) || !Array.isArray(plasma)) return;
+
+      const ctx = $("chartMain").getContext("2d");
+      const labels = [], bzData = [], spdData = [];
+
+      const speedMap = buildSpeedMap(plasma);
+
+      // take last 70 mag points; later we cut to 40 valid points
+      const sliceMag = mag.slice(-70);
+
+      for (let i = 0; i < sliceMag.length; i++) {
+        const row = sliceMag[i];
+        if (!Array.isArray(row) || row.length < 4) continue;
+
+        const iso = row[0];
+        const time = isoToHHMMSS(iso); // ✅ prevents duplicate labels
+        const bzVal = safeNum(row[3]);
+
+        // align speed by SAME timestamp (best effort)
+        const spdVal = speedMap.has(iso) ? speedMap.get(iso) : null;
+
+        labels.push(time);
+
+        // ✅ your proposed logic: keep point but null if invalid
+        bzData.push(Number.isFinite(bzVal) ? bzVal : null);
+        spdData.push(Number.isFinite(spdVal) ? spdVal : null);
       }
-      return { level:"RUHIG", rec: cloudBad ? `Aktuell eher nichts. Wolken sowieso dicht. ${moonMsg}.` : `Aktuell eher nichts. Später nochmal laden. ${moonMsg}.` };
-    }
 
-    // Map (dark tiles)
-    function setupMap(){
-      map = L.map("map", { zoomControl:false }).setView([currentLat, currentLon], 9);
+      // keep last ~40 points for readability
+      const cut = Math.max(0, labels.length - 40);
+      const L = labels.slice(cut);
+      const B = bzData.slice(cut);
+      const S = spdData.slice(cut);
 
-      tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO',
-        subdomains: 'abcd',
-        maxZoom: 20
-      }).addTo(map);
-
-      marker = L.marker([currentLat, currentLon], { draggable:true }).addTo(map);
-      marker.on("dragend", ()=>{
-        const p = marker.getLatLng();
-        setLocation(p.lat, p.lng, `Manuell: (${p.lat.toFixed(2)}, ${p.lng.toFixed(2)})`);
-        updateAll();
-      });
-    }
-
-    function setLocation(lat, lon, label){
-      currentLat = lat; currentLon = lon;
-      $("latText").textContent = lat.toFixed(2);
-      $("lonText").textContent = lon.toFixed(2);
-      $("locationStatus").innerHTML = `Standort: <span class="text-white/80">${label}</span>`;
-      if(map && marker){
-        marker.setLatLng([lat, lon]);
-        map.setView([lat, lon], map.getZoom(), {animate:true});
-      }
-    }
-
-    async function useGPS(){
-      if(!navigator.geolocation){
-        $("locationStatus").innerHTML = `Standort: <span class="text-white/80">GPS nicht verfügbar</span>`;
-        return;
-      }
-      $("locationStatus").innerHTML = `Standort: <span class="text-white/80">GPS… bitte erlauben</span>`;
-      navigator.geolocation.getCurrentPosition(
-        (pos)=>{
-          const lat = pos.coords.latitude;
-          const lon = pos.coords.longitude;
-          setLocation(lat, lon, `GPS ✅ (${lat.toFixed(2)}, ${lon.toFixed(2)})`);
-          updateAll();
-        },
-        ()=>{ $("locationStatus").innerHTML = `Standort: <span class="text-white/80">GPS abgelehnt</span>`; },
-        { enableHighAccuracy:true, timeout:8000, maximumAge:60000 }
-      );
-    }
-
-    // Autocomplete (Nominatim)
-    let suggestTimer = null;
-
-    async function fetchSuggestions(q){
-      const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&q=${encodeURIComponent(q)}`;
-      return await fetchJson(url, 9000);
-    }
-
-    function renderSuggestions(items){
-      const box = $("suggestions");
-      if(!items || items.length===0){
-        box.classList.add("hidden");
-        box.innerHTML = "";
-        return;
-      }
-      box.classList.remove("hidden");
-      box.innerHTML = items.map(it => `
-        <button class="w-full text-left px-3 py-2 rounded-xl hover:bg-white/5 transition"
-                data-lat="${it.lat}" data-lon="${it.lon}" data-name="${(it.display_name||"").replace(/"/g,"&quot;")}">
-          <div class="text-sm text-white/85">${it.display_name}</div>
-          <div class="text-[11px] text-white/45 mono">lat ${Number(it.lat).toFixed(3)} • lon ${Number(it.lon).toFixed(3)}</div>
-        </button>
-      `).join("");
-
-      [...box.querySelectorAll("button")].forEach(btn=>{
-        btn.addEventListener("click", ()=>{
-          const lat = safeNum(btn.dataset.lat);
-          const lon = safeNum(btn.dataset.lon);
-          const name = btn.dataset.name || "Standort gesetzt";
-          if(lat===null || lon===null) return;
-
-          setLocation(lat, lon, name);
-          $("placeInput").value = name.split(",").slice(0,2).join(",").trim();
-          box.classList.add("hidden");
-          box.innerHTML = "";
-          updateAll();
-        });
-      });
-    }
-
-    function setupAutocomplete(){
-      const input = $("placeInput");
-      input.addEventListener("input", ()=>{
-        const q = input.value.trim();
-        if(suggestTimer) clearTimeout(suggestTimer);
-        if(q.length<3){ renderSuggestions([]); return; }
-        suggestTimer = setTimeout(async ()=>{
-          try{ renderSuggestions(await fetchSuggestions(q)); }
-          catch{ renderSuggestions([]); }
-        }, 250);
-      });
-
-      document.addEventListener("click", (e)=>{
-        if(!$("suggestions").contains(e.target) && e.target!==input){
-          $("suggestions").classList.add("hidden");
-        }
-      });
-    }
-
-    // Charts
-    function buildChartBzSpeed(labels, bzArr, spdArr){
-      const ctx = $("chartBzSpeed").getContext("2d");
-      if(chartBzSpeed) chartBzSpeed.destroy();
-
-      chartBzSpeed = new Chart(ctx, {
-        type:"line",
-        data:{
-          labels,
-          datasets:[
-            { label:"Bz (nT)", data:bzArr, tension:.25, pointRadius:0, borderWidth:2, yAxisID:"yBz", spanGaps:false },
-            { label:"Speed (km/s)", data:spdArr, tension:.25, pointRadius:0, borderWidth:2, yAxisID:"ySpd", spanGaps:false }
+      if (chartMain) chartMain.destroy();
+      chartMain = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: L,
+          datasets: [
+            {
+              label: 'Bz (nT)',
+              data: B,
+              borderColor: '#3b82f6',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.25,
+              yAxisID: 'y',
+              spanGaps: false   // ✅ do not connect across nulls
+            },
+            {
+              label: 'Speed (km/s)',
+              data: S,
+              borderColor: '#ef4444',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.25,
+              yAxisID: 'y1',
+              spanGaps: false   // ✅ do not connect across nulls
+            }
           ]
         },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          animation:false,
-          plugins:{ legend:{ labels:{ color:"rgba(255,255,255,.7)" } } },
-          scales:{
-            x:{ ticks:{ color:"rgba(255,255,255,.55)", maxTicksLimit:8 }, grid:{ color:"rgba(255,255,255,.06)" } },
-            yBz:{ ticks:{ color:"rgba(255,255,255,.55)" }, grid:{ color:"rgba(255,255,255,.06)" } },
-            ySpd:{ position:"right", ticks:{ color:"rgba(255,255,255,.55)" }, grid:{ drawOnChartArea:false } }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              ticks: { color: 'rgba(255,255,255,0.45)', maxTicksLimit: 7 },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            },
+            y: {
+              position: 'left',
+              ticks: { color: 'rgba(255,255,255,0.45)' },
+              grid: { color: 'rgba(255,255,255,0.05)' }
+            },
+            y1: {
+              position: 'right',
+              ticks: { color: 'rgba(255,255,255,0.45)' },
+              grid: { display: false }
+            }
           }
         }
       });
     }
 
-    function kpBarColor(v){
-      if(v>=7) return "rgba(239, 68, 68, 0.90)";
-      if(v>=5) return "rgba(245, 158, 11, 0.90)";
-      return "rgba(59, 130, 246, 0.60)";
-    }
-
-    function buildChartKp(labels, kpArr){
-      const ctx = $("chartKp").getContext("2d");
-      if(chartKp) chartKp.destroy();
-
-      chartKp = new Chart(ctx, {
-        type:"bar",
-        data:{
-          labels,
-          datasets:[{
-            label:"Kp",
-            data: kpArr,
-            backgroundColor: (ctx)=> kpBarColor(ctx.raw ?? 0),
-            borderWidth:0
-          }]
-        },
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          animation:false,
-          plugins:{ legend:{ labels:{ color:"rgba(255,255,255,.7)" } } },
-          scales:{
-            x:{ ticks:{ color:"rgba(255,255,255,.55)", maxTicksLimit:8 }, grid:{ color:"rgba(255,255,255,.06)" } },
-            y:{ suggestedMin:0, suggestedMax:9, ticks:{ color:"rgba(255,255,255,.55)" }, grid:{ color:"rgba(255,255,255,.06)" } }
-          }
-        }
-      });
-    }
-
-    // ✅ Build a timestamp->speed map (align mag + plasma by time)
-    function buildSpeedMap(plasma){
-      const map = new Map();
-      if(!Array.isArray(plasma)) return map;
-      for(let i=1;i<plasma.length;i++){
-        const row = plasma[i];
-        if(!Array.isArray(row) || row.length < 3) continue;
-        const t = row[0];
-        const spd = parseFloat(row[2]);
-        map.set(t, Number.isFinite(spd) ? spd : null);
-      }
-      return map;
-    }
-
-    // Main update
-    async function updateAll(){
-      $("updatedAt").textContent = nowHHMM();
-
-      const mi = moonInfo(new Date());
-      $("moonVal").textContent = `Mond: ${mi.emoji} ${mi.name} • ${mi.illumPct}%`;
-      $("moonChip").textContent = `${mi.emoji} ${mi.illumPct}%`;
-
-      updateOvationPanel();
-
-      setDecisionUI("RUHIG", "Lade Daten…");
-      $("dataBadge").textContent = "LIVE";
-
-      // Live summary (fast)
-      let bz=null, speed=null, feedTime=null;
-      try{
-        const sw = await fetchSolarWindSummary();
-        bz = sw.bz;
-        speed = sw.speed;
-        feedTime = sw.time || null;
-      } catch {}
-
-      // Kp
-      let kpVal=null, kpTrend=[];
-      try{
-        const kp = await fetchKpRobust();
-        kpVal = kp.kpVal;
-        kpTrend = kp.kpTrend || [];
-        feedTime = feedTime || kp.kpTime || null;
-      } catch {}
-
-      // Weather
-      const cloud = await fetchCloud(currentLat, currentLon);
-
-      // Render values
-      $("bzVal").textContent = (bz===null) ? "--" : `${bz.toFixed(1)} nT`;
-      $("speedVal").textContent = (speed===null) ? "--" : `${Math.round(speed)}`;
-      const ct = cloudText(cloud);
-      $("cloudVal").textContent = ct.label;
-
-      $("bzChip").textContent = (bz===null) ? "--" : `${bz.toFixed(1)}nT`;
-      $("spdChip").textContent = (speed===null) ? "--" : `${Math.round(speed)}km/s`;
-      $("kpChip").textContent = (kpVal===null) ? "--" : kpVal.toFixed(1);
-      $("cloudChip").textContent = (cloud===null) ? "--" : `${cloud}%`;
-
-      setBzBar(bz);
-
-      if(bz===null && speed===null && kpVal===null) $("dataBadge").textContent = "OFFLINE";
-      else if(bz===null || speed===null) $("dataBadge").textContent = "DEGRADED";
-      else $("dataBadge").textContent = feedTime ? ("LIVE • "+toHHMMfromISO(feedTime)) : "LIVE";
-
-      const decision = computeDecision({bz, speed, kpVal, cloud, moonPenalty: mi.penalty});
-      setDecisionUI(decision.level, decision.rec);
-
-      // ✅ Charts: build with NULLs + HH:MM:SS labels (no duplicates)
-      try{
-        const { mag, plasma } = await fetchSolarWindTables();
-        const speedMap = buildSpeedMap(plasma);
-
-        const magSlice = Array.isArray(mag) ? mag.slice(-60) : []; // little more buffer
-        const labels = [], bzArr = [], spdArr = [];
-
-        for(let i=0;i<magSlice.length;i++){
-          const row = magSlice[i];
-          if(!Array.isArray(row) || row.length < 4) continue;
-
-          const iso = row[0];
-          const time = toHHMMSSfromISO(iso); // ✅ seconds
-          const bzVal = parseFloat(row[3]);
-
-          // best effort: take plasma speed at same timestamp; else null
-          const spdValRaw = speedMap.has(iso) ? speedMap.get(iso) : null;
-          const spdVal = (typeof spdValRaw === "number") ? spdValRaw : parseFloat(spdValRaw);
-
-          labels.push(time);
-          // ✅ your idea: keep point but set null if invalid
-          bzArr.push(Number.isFinite(bzVal) ? bzVal : null);
-          spdArr.push(Number.isFinite(spdVal) ? spdVal : null);
-        }
-
-        if(labels.length > 10){
-          // keep last ~40 points for readability
-          const cut = Math.max(0, labels.length - 40);
-          buildChartBzSpeed(labels.slice(cut), bzArr.slice(cut), spdArr.slice(cut));
-        }
-      } catch {}
-
-      // Kp chart
-      try{
-        if(kpTrend.length > 3){
-          const labels = kpTrend.map(r => toHHMMfromISO(r[0]) || "");
-          const vals = kpTrend.map(r => r[1]);
-          buildChartKp(labels, vals);
-        }
-      } catch {}
-    }
-
-    // Map
-    function setupMap(){
-      map = L.map("map", { zoomControl:false }).setView([currentLat, currentLon], 9);
-
-      tileLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Map init (dark tiles)
+    function initMap() {
+      map = L.map('map', { zoomControl: false }).setView([currentLat, currentLon], 10);
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap &copy; CARTO',
         subdomains: 'abcd',
         maxZoom: 20
       }).addTo(map);
 
-      marker = L.marker([currentLat, currentLon], { draggable:true }).addTo(map);
-      marker.on("dragend", ()=>{
+      marker = L.marker([currentLat, currentLon], { draggable: true }).addTo(map);
+      marker.on('dragend', () => {
         const p = marker.getLatLng();
-        setLocation(p.lat, p.lng, `Manuell: (${p.lat.toFixed(2)}, ${p.lng.toFixed(2)})`);
-        updateAll();
+        currentLat = p.lat;
+        currentLon = p.lng;
+        $("latText").textContent = currentLat.toFixed(2);
+        $("lonText").textContent = currentLon.toFixed(2);
+        update();
       });
     }
 
-    // Init
-    function setup(){
-      $("btnUpdate").addEventListener("click", ()=>updateAll());
-      $("btnGPS").addEventListener("click", ()=>useGPS());
-
-      setupAutocomplete();
-      setupMap();
-      setLocation(currentLat, currentLon, "Chemnitz");
-
-      updateAll();
-      setInterval(updateAll, 60000);
-      setInterval(updateOvationPanel, 300000);
-    }
-
-    setup();
+    $("btnUpdate").onclick = update;
+    initMap();
+    update();
+    setInterval(update, 60000);
   </script>
 </body>
 </html>
