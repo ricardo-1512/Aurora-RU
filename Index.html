@@ -180,7 +180,6 @@
       html[data-theme="system"] .ac-list{ background: rgba(255,255,255,.98); border-color: rgba(0,0,0,.10); }
     }
     html[data-theme="light"] .ac-list{ background: rgba(255,255,255,.98); border-color: rgba(0,0,0,.10); }
-
     .ac-item{
       padding: 12px 12px;
       border-top: 1px solid rgba(127,127,127,.12);
@@ -472,7 +471,7 @@
           </div>
         </div>
 
-        <!-- Diagnostics line for weather (so we see WHY it is empty) -->
+        <!-- Diagnostics line for weather -->
         <div class="diag" id="wxDiag">—</div>
       </div>
     </section>
@@ -547,8 +546,8 @@
           ☁️ Wolkencheck (Windy)
         </a>
 
-        <a class="btn btn-ghost text-left justify-start" target="_blank" rel="noreferrer" href="https://services.swpc.noaa.gov/">
-          🛰 NOAA Datenprodukte
+        <a class="btn btn-ghost text-left justify-start" target="_blank" rel="noreferrer" href="https://polarlicht-vorhersage.de/">
+          🛰 Polarlicht-Vorhersage.de
         </a>
 
         <a class="btn btn-ghost text-left justify-start" target="_blank" rel="noreferrer" href="https://kp.gfz-potsdam.de/">
@@ -583,7 +582,7 @@ const NOAA = {
   mag1d: "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json",
   plasma1d: "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json",
 
-  // ✅ FIX: stabiler Kp-Endpoint (der alte -1-day ist oft weg/kaputt)
+  // stabiler Kp-Endpoint
   kp: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
 
   ovationNH: "https://services.swpc.noaa.gov/images/aurora-forecast-northern-hemisphere.jpg"
@@ -638,14 +637,12 @@ function extractHHMM(t){
   if(!t) return null;
   const s = String(t);
 
-  // ISO: YYYY-MM-DDTHH:MM...
   if(s.includes("T")){
     const d = new Date(s);
     if(!isNaN(d)) return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
     const p = s.split("T")[1] || "";
     return p.slice(0,5);
   }
-  // space: YYYY-MM-DD HH:MM:SS
   if(s.includes(" ")){
     const p = s.split(" ")[1] || "";
     return p.slice(0,5);
@@ -653,25 +650,7 @@ function extractHHMM(t){
   if(/^\d{2}:\d{2}/.test(s)) return s.slice(0,5);
   return null;
 }
-// --- SUN API (unabhängig von Wetter) ---
-// Variante 1: sunrise-sunset.org (kein Key). Liefert UTC → wir formatieren sauber lokal.
-const SUN_API = (lat, lon) =>
-  `https://api.sunrise-sunset.org/json?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lon)}&formatted=0`;
 
-async function fetchSunTimes(lat, lon){
-  const data = await fetchJson(SUN_API(lat, lon), 12000);
-  if(isErr(data)) return { sunrise: null, sunset: null, diag: `Sun API Fehler: ${data.status || ""} ${data.statusText || data.message || ""}`.trim() };
-
-  const res = data?.results;
-  const sr = res?.sunrise ? new Date(res.sunrise) : null;
-  const ss = res?.sunset  ? new Date(res.sunset)  : null;
-
-  const sunrise = (sr && !isNaN(sr)) ? sr.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : null;
-  const sunset  = (ss && !isNaN(ss)) ? ss.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : null;
-
-  return { sunrise, sunset, diag: "Sun: OK" };
-}
-// ✅ Fehler nicht mehr schlucken – wir zeigen Diagnose (429/CORS/Timeout etc.)
 function isErr(x){ return !!(x && typeof x === "object" && x.__error); }
 
 async function fetchJson(url, timeoutMs = 12000){
@@ -701,9 +680,6 @@ function lastValidRow(table, idx){
   for(let i = table.length - 1; i >= 1; i--){
     const row = table[i];
     const v = safeNum(row?.[idx]);
-
-    // ✅ Zero-Gaps: 0 bei Solarwind ist oft "Gap" → ignorieren (für Bz/Speed sinnvoll)
-    // Aber Achtung: Bz kann real 0 sein. Wir werten 0 nur als Gap, wenn die Nachbarwerte nullig sind.
     if(v !== null){
       return row;
     }
@@ -742,7 +718,7 @@ function clearGlow(el){
 }
 
 /***********************
- *  THEME TOGGLE (system/light/dark)
+ *  THEME TOGGLE
  ***********************/
 function getTheme(){
   return localStorage.getItem("aurora_theme") || "system";
@@ -885,31 +861,25 @@ function setupMap(){
 function computeAuroraScore({ bz, spd, kp, cloud, moonIllum, isNight }){
   let score = 0;
 
-  // Kp weight (0..9 => 0..70)
   if(kp !== null) score += clamp((kp / 9) * 70, 0, 70);
 
-  // Bz bonus (0..-20 => 0..20)
   if(bz !== null){
     score += clamp(((-bz) / 20) * 20, 0, 20);
     if(bz <= -10) score += 6;
   }
 
-  // Speed bonus (300..800 => 0..18)
   if(spd !== null){
     score += clamp(((spd - 300) / 500) * 18, 0, 18);
     if(spd >= 600) score += 4;
   }
 
-  // Day penalty (wenn wir isNight nicht wissen, dämpfen wir NICHT)
   if(isNight === false) score *= 0.22;
 
-  // Clouds reduce visibility (wenn cloud unbekannt → kein Abzug)
   if(cloud !== null){
     const clearFactor = clamp((100 - cloud) / 100, 0, 1);
     score *= clearFactor;
   }
 
-  // Moon penalty (0..~18)
   if(moonIllum !== null){
     const pen = clamp((moonIllum / 100) * 18, 0, 18);
     score -= pen;
@@ -938,7 +908,7 @@ function decideStatus({ score, bz, spd, cloud, isNight }){
 
   const strong = (bz !== null && spd !== null && bz <= -10 && spd >= 520);
   const veryClear = (cloud !== null && cloud <= 30);
-  const okNight = (isNight !== false); // wenn unknown, lassen wir's gelten
+  const okNight = (isNight !== false);
 
   if(okNight && (score >= 70 || (strong && veryClear))){
     statusEl.textContent = "ALARM";
@@ -1043,7 +1013,6 @@ function buildChartKp(labels, values){
 /***********************
  *  OVATION + GFZ
  ***********************/
-
 function refreshOvation(){
   $("ovationFallback").classList.add("hidden");
   const ts = Date.now();
@@ -1107,7 +1076,6 @@ function renderKpChart(kpTable) {
     return { lastKp: null, diag: "Kp leer" };
   }
 
-  // Header/Strings raus: wir behalten nur Zeilen, deren [0] ein parsebares Datum ist
   const dataRows = kpTable
     .filter(r => Array.isArray(r) && r.length >= 2)
     .filter(r => r[0] && !Number.isNaN(Date.parse(r[0])));
@@ -1151,7 +1119,6 @@ function setLiveBadge(text, state){
 }
 
 function bzTrendArrowFromSeries(mag1d){
-  // klein & robust: verglichen letzte 2 gültige Bz-Werte
   if(!Array.isArray(mag1d) || mag1d.length < 6) return "";
   let last = null, prev = null;
 
@@ -1163,7 +1130,6 @@ function bzTrendArrowFromSeries(mag1d){
     break;
   }
   if(last === null || prev === null) return "";
-  // Bz negativer = besser. Wir zeigen Pfeil Richtung "negativer" (fallend) als ↘︎
   if(last < prev) return "↘︎";
   if(last > prev) return "↗︎";
   return "→";
@@ -1196,7 +1162,6 @@ async function updateAll(){
     fetchJson(NOAA.kp, 12000)
   ]);
 
-  // Kp: Diagnose
   if(isErr(kpTable)){
     setDiag("kpDiag", `Kp Fehler: ${kpTable.status || ""} ${kpTable.statusText || kpTable.message || ""}`.trim());
     $("kpInfo").textContent = "Kp: keine Daten (NOAA nicht erreichbar).";
@@ -1204,7 +1169,6 @@ async function updateAll(){
     setDiag("kpDiag", "Kp: ok");
   }
 
-  // fallback bz/spd from tables
   if(bz === null && !isErr(mag1d) && Array.isArray(mag1d)){
     const last = lastValidRow(mag1d, 3);
     bz = last ? safeNum(last[3]) : null;
@@ -1214,130 +1178,93 @@ async function updateAll(){
     spd = last ? safeNum(last[2]) : null;
   }
 
-  // Trend arrow
   const bzTrend = (!isErr(mag1d) ? bzTrendArrowFromSeries(mag1d) : "");
   $("chipBzTrend").textContent = bzTrend ? ` ${bzTrend}` : "";
 
-  // Kp last
   let kp = null;
   if(!isErr(kpTable) && Array.isArray(kpTable)){
     const last = lastValidRow(kpTable, 1);
     kp = last ? safeNum(last[1]) : null;
   }
 
-  // 3) Weather (robust + fallback)
-  // --- WETTER (Open-Meteo) — robust & simpel ---
-let cloud = null, moonIllum = null, isNight = null;
+  // 3) Weather (Open-Meteo)
+  let cloud = null, moonIllum = null, isNight = null;
 
-// Explizite URL (ohne forecast_days, damit weniger Fehlerquellen)
-const wxUrl =
-  `https://api.open-meteo.com/v1/forecast` +
-  `?latitude=${encodeURIComponent(currentLat)}` +
-  `&longitude=${encodeURIComponent(currentLon)}` +
-  `&current=cloud_cover,is_day` +
-  `&daily=sunrise,sunset,moon_illumination` +
-  `&timezone=auto`;
+  const wxUrl = OPEN_METEO.url(currentLat, currentLon);
+  const wx = await fetchJson(wxUrl, 12000);
 
-const wx = await fetchJson(wxUrl, 12000);
-
-if (isErr(wx)) {
-  setWeatherUnavailable(`Wetter Fehler: ${wx.status || ""} ${wx.statusText || wx.message || ""}`.trim());
-} else {
-  // Werte aus current
-  cloud = (wx?.current?.cloud_cover ?? null);
-  cloud = (cloud === null) ? null : Number(cloud);
-  if (!Number.isFinite(cloud)) cloud = null;
-
-  const isDayRaw = wx?.current?.is_day;
-  // is_day ist 0/1 (kann aber auch undefined sein)
-  if (isDayRaw === 0) isNight = true;
-  else if (isDayRaw === 1) isNight = false;
-  else isNight = null;
-
-  // Daily (Sonne/Mond)
-  const sr = wx?.daily?.sunrise?.[0] ?? null;
-  const ss = wx?.daily?.sunset?.[0] ?? null;
-
-  $("sunrise").textContent = extractHHMM(sr) || "--:--";
-  $("sunset").textContent  = extractHHMM(ss) || "--:--";
-
-  moonIllum = wx?.daily?.moon_illumination?.[0] ?? null;
-  moonIllum = (moonIllum === null) ? null : Number(moonIllum);
-  if (!Number.isFinite(moonIllum)) moonIllum = null;
-
-  // Open-Meteo moon_illumination ist typischerweise 0..1 oder 0..100 → normalisieren
-  if (moonIllum !== null && moonIllum <= 1.01) moonIllum *= 100;
-  if (moonIllum !== null) moonIllum = clamp(moonIllum, 0, 100);
-
-  // Chips & Cards
-  $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
-  $("valCloud").textContent  = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
-
-  $("chipMoon").textContent = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
-  $("valMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
-
-  // Icons/Text
-  if (cloud === null) {
-    $("icoCloud").textContent = "☁️";
-    $("valCloudTxt").textContent = "—";
-  } else if (cloud > 70) {
-    $("icoCloud").textContent = "☁️";
-    $("valCloudTxt").textContent = "Bewölkt";
-  } else if (cloud > 20) {
-    $("icoCloud").textContent = "⛅";
-    $("valCloudTxt").textContent = "Teils klar";
+  if (isErr(wx)) {
+    setWeatherUnavailable(`Wetter Fehler: ${wx.status || ""} ${wx.statusText || wx.message || ""}`.trim());
   } else {
-    $("icoCloud").textContent = "✨";
-    $("valCloudTxt").textContent = "Klar";
+    cloud = (wx?.current?.cloud_cover ?? null);
+    cloud = (cloud === null) ? null : Number(cloud);
+    if (!Number.isFinite(cloud)) cloud = null;
+
+    const isDayRaw = wx?.current?.is_day;
+    if (isDayRaw === 0) isNight = true;
+    else if (isDayRaw === 1) isNight = false;
+    else isNight = null;
+
+    const sr = wx?.daily?.sunrise?.[0] ?? null;
+    const ss = wx?.daily?.sunset?.[0] ?? null;
+
+    $("sunrise").textContent = extractHHMM(sr) || "--:--";
+    $("sunset").textContent  = extractHHMM(ss) || "--:--";
+
+    moonIllum = wx?.daily?.moon_illumination?.[0] ?? null;
+    moonIllum = (moonIllum === null) ? null : Number(moonIllum);
+    if (!Number.isFinite(moonIllum)) moonIllum = null;
+
+    if (moonIllum !== null && moonIllum <= 1.01) moonIllum *= 100;
+    if (moonIllum !== null) moonIllum = clamp(moonIllum, 0, 100);
+
+    $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
+    $("valCloud").textContent  = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
+
+    $("chipMoon").textContent = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
+    $("valMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
+
+    if (cloud === null) {
+      $("icoCloud").textContent = "☁️";
+      $("valCloudTxt").textContent = "—";
+    } else if (cloud > 70) {
+      $("icoCloud").textContent = "☁️";
+      $("valCloudTxt").textContent = "Bewölkt";
+    } else if (cloud > 20) {
+      $("icoCloud").textContent = "⛅";
+      $("valCloudTxt").textContent = "Teils klar";
+    } else {
+      $("icoCloud").textContent = "✨";
+      $("valCloudTxt").textContent = "Klar";
+    }
+
+    if (moonIllum === null) {
+      $("icoMoon").textContent = "🌙";
+      $("valMoonTxt").textContent = "—";
+    } else if (moonIllum > 75) {
+      $("icoMoon").textContent = "🌕";
+      $("valMoonTxt").textContent = "Hell";
+    } else if (moonIllum > 35) {
+      $("icoMoon").textContent = "🌓";
+      $("valMoonTxt").textContent = "Mittel";
+    } else {
+      $("icoMoon").textContent = "🌙";
+      $("valMoonTxt").textContent = "Dunkel (top)";
+    }
+
+    if (isNight === true) {
+      $("tagDayNight").textContent = "NACHT";
+      $("uiNight").textContent = "Nacht";
+    } else if (isNight === false) {
+      $("tagDayNight").textContent = "TAG/DÄMMERUNG";
+      $("uiNight").textContent = "Tag/Dämmerung";
+    } else {
+      $("tagDayNight").textContent = "—";
+      $("uiNight").textContent = "—";
+    }
+
+    setDiag("wxDiag", "Wetter: OK");
   }
-
-  if (moonIllum === null) {
-    $("icoMoon").textContent = "🌙";
-    $("valMoonTxt").textContent = "—";
-  } else if (moonIllum > 75) {
-    $("icoMoon").textContent = "🌕";
-    $("valMoonTxt").textContent = "Hell";
-  } else if (moonIllum > 35) {
-    $("icoMoon").textContent = "🌓";
-    $("valMoonTxt").textContent = "Mittel";
-  } else {
-    $("icoMoon").textContent = "🌙";
-    $("valMoonTxt").textContent = "Dunkel (top)";
-  }
-
-  // Tag/Nacht Tags
-  if (isNight === true) {
-    $("tagDayNight").textContent = "NACHT";
-    $("uiNight").textContent = "Nacht";
-  } else if (isNight === false) {
-    $("tagDayNight").textContent = "TAG/DÄMMERUNG";
-    $("uiNight").textContent = "Tag/Dämmerung";
-  } else {
-    $("tagDayNight").textContent = "—";
-    $("uiNight").textContent = "—";
-  }
-
-  setDiag("wxDiag", "Wetter: OK");
-}
-
-// --- SUN API (unabhängig von Wetter) ---
-// Variante 1: sunrise-sunset.org (kein Key). Liefert UTC → wir formatieren sauber lokal.
-const SUN_API = (lat, lon) =>
-  `https://api.sunrise-sunset.org/json?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lon)}&formatted=0`;
-
-async function fetchSunTimes(lat, lon){
-  const data = await fetchJson(SUN_API(lat, lon), 12000);
-  if(isErr(data)) return { sunrise: null, sunset: null, diag: `Sun API Fehler: ${data.status || ""} ${data.statusText || data.message || ""}`.trim() };
-
-  const res = data?.results;
-  const sr = res?.sunrise ? new Date(res.sunrise) : null;
-  const ss = res?.sunset  ? new Date(res.sunset)  : null;
-
-  const sunrise = (sr && !isNaN(sr)) ? sr.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : null;
-  const sunset  = (ss && !isNaN(ss)) ? ss.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : null;
-
-  return { sunrise, sunset, diag: "Sun: OK" };
-}
 
   // 4) Fill solarwind UI
   $("valBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
@@ -1362,109 +1289,64 @@ async function fetchSunTimes(lat, lon){
   if(!isErr(mag1d) && !isErr(plasma1d)){
     renderTrendChart(mag1d, plasma1d);
   }
-
-  if(!isErr(kpTable)){
-    const { diag } = renderKpChart(kpTable);
-    setDiag("kpDiag", diag || "Kp: ok");
-  }
-
-  // 8) Images
-  refreshGFZ();
-  refreshOvation();
 }
 
-/***********************
- *  EVENTS
- ***********************/
-$("btnUpdate").addEventListener("click", () => updateAll());
-
-$("btnGPS").addEventListener("click", () => {
-  if(!navigator.geolocation){
-    alert("GPS nicht verfügbar.");
-    return;
-  }
-  setLiveBadge("gps…", "warn");
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      currentLat = pos.coords.latitude;
-      currentLon = pos.coords.longitude;
-      $("placeInput").value = "";
-      hideAc();
-      moveMap(currentLat, currentLon, true);
-      updateAll();
-    },
-    () => {
-      alert("Ortung abgelehnt oder fehlgeschlagen.");
-      setLiveBadge("offline", "err");
-    },
-    { enableHighAccuracy: true, timeout: 10000 }
-  );
-});
-
-$("btnOvaRefresh").addEventListener("click", () => refreshOvation());
-$("btnTheme").addEventListener("click", () => {
-  cycleTheme();
-  updateMapStyleBadge();
-});
-
-$("placeInput").addEventListener("input", (e) => {
-  const q = e.target.value.trim();
-  clearTimeout(acTimer);
-
-  if(q.length < 3){
-    hideAc();
-    return;
-  }
-  acTimer = setTimeout(async () => {
-    const items = await acSearch(q);
-    showAc(items);
-  }, 280);
-});
-
-document.addEventListener("click", (e) => {
-  const ac = $("placeInput");
-  const list = $("acList");
-  if(e.target !== ac && !list.contains(e.target)) hideAc();
-});
-
-// Bottom tabs scroll
-document.querySelectorAll(".tab").forEach(tab => {
-  tab.addEventListener("click", () => {
-    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
-    tab.classList.add("active");
-    const id = tab.getAttribute("data-target");
-    const el = document.getElementById(id);
-    if(el) el.scrollIntoView({ behavior:"smooth", block:"start" });
+function initTabs(){
+  const tabs = document.querySelectorAll(".tab");
+  tabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+      const target = tab.getAttribute("data-target");
+      document.querySelectorAll("section[id^='sec']").forEach(sec => {
+        if(sec.id === target) sec.classList.remove("hidden");
+        else sec.classList.add("hidden");
+      });
+      tabs.forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+    });
   });
-});
+}
 
 /***********************
  *  INIT
  ***********************/
-function init(){
-  // kleine Chips (keine überflüssigen Wörter)
-  $("chipOverlay").textContent = "OVAL";
-  $("chipNightline").textContent = "NACHT";
-
+document.addEventListener("DOMContentLoaded", () => {
   setTheme(getTheme());
-  moveMap(currentLat, currentLon);
+
   setupMap();
-
-  refreshGFZ();
   refreshOvation();
+  refreshGFZ();
 
-  updateAll();
-  setInterval(updateAll, 60000);
-
-  // system theme changes while on "system"
-  if(window.matchMedia){
-    window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-      if(getTheme() === "system") updateMapStyleBadge();
+  $("btnUpdate").addEventListener("click", () => updateAll());
+  $("btnOvaRefresh").addEventListener("click", () => refreshOvation());
+  $("btnTheme").addEventListener("click", () => cycleTheme());
+  $("btnGPS").addEventListener("click", () => {
+    if(!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(pos => {
+      currentLat = pos.coords.latitude;
+      currentLon = pos.coords.longitude;
+      moveMap(currentLat, currentLon, true);
+      updateAll();
     });
-  }
-}
+  });
 
-init();
-</script>
+  const inp = $("placeInput");
+  inp.addEventListener("input", () => {
+    const v = inp.value.trim();
+    if(!v){ hideAc(); return; }
+    clearTimeout(acTimer);
+    acTimer = setTimeout(async () => {
+      const items = await acSearch(v);
+      showAc(items);
+    }, 350);
+  });
+  inp.addEventListener("blur", () => {
+    setTimeout(hideAc, 200);
+  });
+
+  initTabs();
+  updateAll();
+  setInterval(updateAll, 60 * 1000);
+});
+  </script>
 </body>
 </html>
