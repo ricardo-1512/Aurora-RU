@@ -522,9 +522,6 @@
         <div class="img-frame">
           <img id="ovationGlobal" alt="NOAA Ovation Global" />
         </div>
-        <div class="img-frame">
-          <img id="ovationEurope" class="europe-crop" alt="NOAA Ovation Europa-Zoom" />
-        </div>
       </div>
 
       <div class="flex items-center justify-between mt-3">
@@ -1046,19 +1043,15 @@ function buildChartKp(labels, values){
 /***********************
  *  OVATION + GFZ
  ***********************/
+
 function refreshOvation(){
   $("ovationFallback").classList.add("hidden");
   const ts = Date.now();
   const src = `${NOAA.ovationNH}?ts=${ts}`;
 
   const g = $("ovationGlobal");
-  const e = $("ovationEurope");
-
   g.onerror = () => $("ovationFallback").classList.remove("hidden");
-  e.onerror = () => $("ovationFallback").classList.remove("hidden");
-
   g.src = src;
-  e.src = src;
 
   $("ovaTime").textContent = fmtTimeLocal();
 }
@@ -1325,6 +1318,25 @@ if (isErr(wx)) {
   }
 
   setDiag("wxDiag", "Wetter: OK");
+}
+
+// --- SUN API (unabhängig von Wetter) ---
+// Variante 1: sunrise-sunset.org (kein Key). Liefert UTC → wir formatieren sauber lokal.
+const SUN_API = (lat, lon) =>
+  `https://api.sunrise-sunset.org/json?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lon)}&formatted=0`;
+
+async function fetchSunTimes(lat, lon){
+  const data = await fetchJson(SUN_API(lat, lon), 12000);
+  if(isErr(data)) return { sunrise: null, sunset: null, diag: `Sun API Fehler: ${data.status || ""} ${data.statusText || data.message || ""}`.trim() };
+
+  const res = data?.results;
+  const sr = res?.sunrise ? new Date(res.sunrise) : null;
+  const ss = res?.sunset  ? new Date(res.sunset)  : null;
+
+  const sunrise = (sr && !isNaN(sr)) ? sr.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : null;
+  const sunset  = (ss && !isNaN(ss)) ? ss.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}) : null;
+
+  return { sunrise, sunset, diag: "Sun: OK" };
 }
 
   // 4) Fill solarwind UI
