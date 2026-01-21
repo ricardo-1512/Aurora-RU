@@ -1,1037 +1,207 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AURORA X — v4 (GFZ • Score • Ovation • Robust)</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AURORA X — Decision App</title>
 
-  <!-- UI -->
-  <script src="https://cdn.tailwindcss.com"></script>
+<!-- Tailwind -->
+<script src="https://cdn.tailwindcss.com"></script>
 
-  <!-- Leaflet (Map) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Leaflet -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-  <!-- Charts -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
-  <style>
-    :root{
-      --bg:#070707;
-      --card: rgba(255,255,255,.035);
-      --border: rgba(255,255,255,.08);
-      --muted: rgba(255,255,255,.55);
-      --muted2: rgba(255,255,255,.35);
-      --glassA: rgba(34,197,94,.14);
-      --glassB: rgba(59,130,246,.10);
-      --shadow: 0 20px 60px rgba(0,0,0,.55);
-    }
-    html,body{ background:var(--bg); color:#fff; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
-    .glass{
-      background:
-        radial-gradient(900px 400px at 15% -10%, var(--glassA), transparent 60%),
-        radial-gradient(800px 380px at 95% 0%, var(--glassB), transparent 62%),
-        linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.02));
-      border: 1px solid var(--border);
-      backdrop-filter: blur(14px);
-      box-shadow: var(--shadow);
-    }
-    .card{
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      box-shadow: 0 16px 50px rgba(0,0,0,.35);
-    }
-    .badge{
-      border: 1px solid rgba(255,255,255,.10);
-      background: rgba(0,0,0,.28);
-      border-radius: 999px;
-      padding: .25rem .55rem;
-      font-size: 10px;
-      letter-spacing: .14em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,.62);
-      display: inline-flex;
-      align-items: center;
-      gap: .35rem;
-      white-space: nowrap;
-    }
-    .input{
-      background: rgba(0,0,0,.45);
-      border: 1px solid rgba(255,255,255,.12);
-      border-radius: 12px;
-      padding: 10px 12px;
-      color: #fff;
-      outline: none;
-    }
-    .input:focus{ border-color: rgba(34,197,94,.55); box-shadow: 0 0 0 3px rgba(34,197,94,.15); }
-    .btn{
-      border-radius: 14px;
-      padding: 10px 14px;
-      font-size: 11px;
-      font-weight: 800;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      transition: transform .08s ease, filter .2s ease;
-      user-select: none;
-    }
-    .btn:active{ transform: translateY(1px) scale(.99); }
-    .btn-primary{ background: #22c55e; color:#052e16; }
-    .btn-ghost{ background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10); color: rgba(255,255,255,.85); }
-    .btn-warn{ background: rgba(245,158,11,.18); border:1px solid rgba(245,158,11,.35); color: rgba(255,255,255,.92); }
-    .btn-danger{ background: rgba(239,68,68,.18); border:1px solid rgba(239,68,68,.35); color: rgba(255,255,255,.92); }
+<style>
+:root{
+  --bg:#070707;
+  --card:rgba(255,255,255,.035);
+  --border:rgba(255,255,255,.08);
+  --muted:rgba(255,255,255,.55);
+  --glassA:rgba(34,197,94,.14);
+  --glassB:rgba(59,130,246,.12);
+}
+html,body{background:var(--bg);color:#fff;font-family:system-ui;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:18px}
+.badge{border:1px solid rgba(255,255,255,.12);padding:.25rem .6rem;border-radius:999px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--muted)}
+.glow-red{color:#ef4444;text-shadow:0 0 24px rgba(239,68,68,.5)}
+.glow-yellow{color:#f59e0b;text-shadow:0 0 22px rgba(245,158,11,.4)}
+.glow-green{color:#22c55e;text-shadow:0 0 20px rgba(34,197,94,.4)}
+#map{height:240px;border-radius:16px}
 
-    .glow-red{ color:#ef4444; text-shadow: 0 0 24px rgba(239,68,68,.45); }
-    .glow-yellow{ color:#f59e0b; text-shadow: 0 0 24px rgba(245,158,11,.35); }
-    .glow-green{ color:#22c55e; text-shadow: 0 0 24px rgba(34,197,94,.35); }
-
-    #map{
-      height: 240px;
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,.10);
-      overflow: hidden;
-    }
-
-    .chart-wrap{ height: 210px; width:100%; position: relative; }
-    .chart-wrap.tall{ height: 260px; }
-    canvas{ max-width: 100% !important; }
-
-    /* Autocomplete dropdown */
-    .ac{
-      position: relative;
-    }
-    .ac-list{
-      position:absolute;
-      top: calc(100% + 8px);
-      left:0;
-      right:0;
-      z-index: 9999;
-      background: rgba(15,15,15,.98);
-      border:1px solid rgba(255,255,255,.10);
-      border-radius: 14px;
-      overflow:hidden;
-      box-shadow: 0 16px 50px rgba(0,0,0,.55);
-    }
-    .ac-item{
-      padding: 10px 12px;
-      border-top: 1px solid rgba(255,255,255,.06);
-      cursor: pointer;
-      font-size: 13px;
-      color: rgba(255,255,255,.9);
-    }
-    .ac-item:first-child{ border-top:none; }
-    .ac-item:hover{ background: rgba(255,255,255,.06); }
-
-    /* Ovation images */
-    .img-frame{
-      border-radius: 16px;
-      border: 1px solid rgba(255,255,255,.10);
-      overflow: hidden;
-      background: rgba(0,0,0,.35);
-    }
-    .img-frame img{ width:100%; height:auto; display:block; }
-    .europe-crop{
-      width:100%;
-      height: 220px;
-      object-fit: cover;
-      /* Fokus grob auf Europa bei Polar-Projection – ggf. minimal anpassen */
-      object-position: 65% 60%;
-      display:block;
-    }
-
-    /* GFZ quicklook: weißer Hintergrund => leicht abdunkeln */
-    .gfz{
-      width:100%;
-      height:auto;
-      display:block;
-      border-radius:16px;
-      border:1px solid rgba(255,255,255,.10);
-      overflow:hidden;
-      background: rgba(0,0,0,.25);
-    }
-    .gfz img{
-      width:100%;
-      height:auto;
-      display:block;
-      /* optional: etwas weniger “blendend” */
-      filter: brightness(.9) contrast(1.05);
-    }
-  </style>
+/* Light mode */
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#f6f7f9;
+    --card:rgba(0,0,0,.04);
+    --border:rgba(0,0,0,.08);
+    --muted:rgba(0,0,0,.55);
+  }
+  html,body{color:#111}
+  .badge{background:rgba(0,0,0,.04);color:rgba(0,0,0,.6)}
+}
+</style>
 </head>
 
-<body class="p-4 md:p-6">
-  <div class="max-w-2xl mx-auto">
+<body class="p-4">
+<div class="max-w-2xl mx-auto space-y-4">
 
-    <!-- Header / Location -->
-    <div class="glass rounded-2xl p-5 mb-4">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <h1 class="text-xl font-black tracking-tight">AURORA <span class="text-green-400">X</span></h1>
-          <div class="flex flex-wrap gap-2 mt-2">
-            <span class="badge" id="badgeLive">offline</span>
-            <span class="badge">LAT: <span class="mono" id="uiLat">--</span></span>
-            <span class="badge">LON: <span class="mono" id="uiLon">--</span></span>
-          </div>
-        </div>
-        <div class="text-right">
-          <div class="text-[10px] text-white/40 mono">Letztes Update</div>
-          <div class="text-[13px] text-white/70 mono" id="uiUpdated">--:--</div>
-        </div>
-      </div>
+<!-- HEADER -->
+<div class="card p-5">
+  <h1 class="text-xl font-black">AURORA <span class="text-green-400">X</span></h1>
+  <div class="flex gap-2 mt-2">
+    <span class="badge" id="badgeLive">—</span>
+    <span class="badge">LAT <span id="uiLat">--</span></span>
+    <span class="badge">LON <span id="uiLon">--</span></span>
+  </div>
+</div>
 
-      <div class="mt-4 grid grid-cols-1 gap-3">
-        <div class="ac">
-          <input id="placeInput" class="input w-full text-sm" placeholder="Ort suchen (z. B. Chemnitz, Leipzig, Berlin) …" autocomplete="off">
-          <div id="acList" class="ac-list hidden"></div>
-        </div>
+<!-- MAP -->
+<div class="card p-4">
+  <div class="flex justify-between mb-2">
+    <span class="badge">Karte & Schwellen</span>
+    <span class="badge">Night Map</span>
+  </div>
+  <div id="map"></div>
+</div>
 
-        <div class="flex gap-2">
-          <button class="btn btn-primary flex-1" id="btnUpdate">Update</button>
-          <button class="btn btn-ghost" id="btnGPS" title="Standort per GPS">📍</button>
-        </div>
+<!-- DECISION -->
+<div class="card p-6 text-center">
+  <div class="badge mb-3">Geh ich raus?</div>
+  <div id="mainStatus" class="text-6xl font-black text-white/20">ANALYSE</div>
+  <div id="mainRec" class="text-sm text-white/60 italic mt-2">—</div>
 
-        <div class="text-xs text-white/50">
-          Tipp: Zieh den Pin auf einen dunklen Spot außerhalb der Stadt und prüfe Wolken dort.
-        </div>
-      </div>
+  <div class="mt-5">
+    <span class="badge">Aurora-Score</span>
+    <div class="text-3xl font-black mt-1"><span id="uiScore">--</span>/100</div>
+    <div class="h-2 bg-white/10 rounded-full mt-2 overflow-hidden">
+      <div id="scoreBar" class="h-full bg-green-500" style="width:0%"></div>
     </div>
-
-    <!-- Map (moved directly under location as requested) -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] text-white/50 uppercase font-black tracking-[.25em]">Standort-Pin (draggable)</div>
-        <span class="badge">Night Map</span>
-      </div>
-      <div id="map"></div>
-      <div class="text-[11px] text-white/45 mt-3">
-        Kartenstil: CARTO Dark Matter • Daten: OpenStreetMap
-      </div>
-    </div>
-
-    <!-- Main Decision / Score -->
-    <div class="card p-8 text-center mb-4">
-      <div class="badge mx-auto mb-4">Entscheidung „Geh ich raus?“</div>
-      <div id="mainStatus" class="text-6xl font-black tracking-tight text-white/20">ANALYSE</div>
-      <div class="mt-2 text-sm text-white/60 italic px-2" id="mainRec">Daten werden geladen …</div>
-
-      <!-- Score row -->
-      <div class="mt-6">
-        <div class="flex items-center justify-center gap-2 mb-3">
-          <span class="badge">Aurora-Score</span>
-          <span class="text-2xl font-black mono" id="uiScore">--</span>
-          <span class="text-sm text-white/50">/ 100</span>
-        </div>
-        <div class="h-2 w-full bg-white/10 rounded-full overflow-hidden">
-          <div id="scoreBar" class="h-full bg-green-500" style="width:0%"></div>
-        </div>
-        <div class="mt-3 text-[12px] text-white/55" id="uiScoreWhy">—</div>
-      </div>
-
-      <!-- Chips -->
-      <div class="flex flex-wrap justify-center gap-2 mt-7">
-        <span class="badge">Bz: <span id="chipBz" class="mono">--</span> nT</span>
-        <span class="badge">Speed: <span id="chipSpd" class="mono">--</span> km/s</span>
-        <span class="badge">Kp: <span id="chipKp" class="mono">--</span></span>
-        <span class="badge">Cloud: <span id="chipCloud" class="mono">--</span></span>
-        <span class="badge">Mond: <span id="chipMoon" class="mono">--</span></span>
-      </div>
-    </div>
-
-    <!-- Key values -->
-    <div class="grid grid-cols-2 gap-3 mb-4">
-      <div class="card p-4">
-        <div class="text-[10px] text-white/40 uppercase font-black tracking-[.22em] mb-1">Sonnenwind Speed</div>
-        <div class="text-3xl font-black mono" id="valSpd">--</div>
-        <div class="text-[11px] text-white/35">km/s • höher = besser</div>
-      </div>
-      <div class="card p-4">
-        <div class="text-[10px] text-white/40 uppercase font-black tracking-[.22em] mb-1">Magnetfeld Bz</div>
-        <div class="text-3xl font-black mono" id="valBz">--</div>
-        <div class="text-[11px] text-white/35">nT • je negativer, desto besser</div>
-      </div>
-    </div>
-
-    <!-- Weather & Moon + Twilight -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] text-white/50 uppercase font-black tracking-[.25em]">Wetter & Mond</div>
-        <span class="badge" id="uiNight">—</span>
-      </div>
-
-      <div class="grid grid-cols-2 gap-3">
-        <div class="card p-4">
-          <div class="text-[10px] text-white/40 uppercase font-black tracking-[.22em] mb-1">Bewölkung</div>
-          <div class="text-3xl font-black mono" id="valCloud">--</div>
-          <div class="text-[11px] text-white/35" id="valCloudTxt">—</div>
-        </div>
-        <div class="card p-4">
-          <div class="text-[10px] text-white/40 uppercase font-black tracking-[.22em] mb-1">Mondlicht</div>
-          <div class="text-3xl font-black mono" id="valMoon">--</div>
-          <div class="text-[11px] text-white/35" id="valMoonTxt">—</div>
-        </div>
-      </div>
-
-      <div class="card p-4 mt-3">
-        <div class="text-[10px] text-white/40 uppercase font-black tracking-[.22em] mb-2">Dämmerung (einfach)</div>
-        <div class="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <div class="text-white/50 text-[11px]">Sonnenuntergang</div>
-            <div class="mono font-black" id="sunset">--:--</div>
-          </div>
-          <div>
-            <div class="text-white/50 text-[11px]">Sonnenaufgang</div>
-            <div class="mono font-black" id="sunrise">--:--</div>
-          </div>
-        </div>
-        <div class="text-[11px] text-white/40 mt-2">Für „bürgerlich/nautisch/astronomisch“ bräuchten wir eine extra Astro-API. (Kann man als nächstes ausbauen.)</div>
-      </div>
-    </div>
-
-    <!-- Charts -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] text-white/50 uppercase font-black tracking-[.25em]">Bz & Speed (letzte ~2h)</div>
-        <span class="badge">filtered • null-gaps</span>
-      </div>
-      <div class="chart-wrap">
-        <canvas id="chartMain"></canvas>
-      </div>
-    </div>
-
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] text-white/50 uppercase font-black tracking-[.25em]">Kp Index (letzte 24h)</div>
-        <span class="badge">gelb ab 5 • rot ab 7</span>
-      </div>
-      <div class="chart-wrap">
-        <canvas id="chartKp"></canvas>
-      </div>
-    </div>
-
-    <!-- GFZ Quicklook -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] text-white/50 uppercase font-black tracking-[.25em]">GFZ Potsdam Quicklook (Europa oft schneller)</div>
-        <span class="badge">GFZ</span>
-      </div>
-
-      <div class="gfz img-frame">
-        <img id="gfzImg" alt="GFZ Quicklook" />
-      </div>
-
-      <div class="text-[11px] text-white/45 mt-3">
-        Quelle: GFZ Potsdam (Quicklook) • Hinweis: Bild kann weißen Hintergrund haben.
-      </div>
-    </div>
-
-    <!-- Ovation Panels -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] text-white/50 uppercase font-black tracking-[.25em]">OVATION Aurora Oval (NOAA, ~30–90 min)</div>
-        <div class="flex gap-2">
-          <button class="btn btn-ghost" id="btnOvaRefresh">Refresh</button>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-1 gap-3">
-        <div class="img-frame">
-          <img id="ovationGlobal" alt="NOAA Ovation Global" />
-        </div>
-        <div class="img-frame">
-          <img id="ovationEurope" class="europe-crop" alt="NOAA Ovation Europa-Zoom" />
-        </div>
-      </div>
-
-      <div class="flex items-center justify-between mt-3">
-        <div class="text-[11px] text-white/45">
-          Oval = Nowcast/Forecast. Praxis bleibt: Bz + Speed + Wolken + dunkler Spot.
-        </div>
-        <span class="badge">refresh: <span id="ovaTime" class="mono">--:--</span></span>
-      </div>
-
-      <div id="ovationFallback" class="hidden mt-3 text-sm text-white/60">
-        OVATION gerade nicht erreichbar. Bitte später refreshen.
-      </div>
-    </div>
-
-    <!-- Useful Links -->
-    <div class="card p-4 mb-8">
-      <div class="text-[10px] text-white/50 uppercase font-black tracking-[.25em] mb-3">Praktische Links</div>
-      <div class="grid grid-cols-1 gap-2 text-sm">
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer" href="https://www.swpc.noaa.gov/">NOAA Space Weather (SWPC)</a>
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer" href="https://services.swpc.noaa.gov/">NOAA Data Products (JSON)</a>
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer" href="https://kp.gfz-potsdam.de/">GFZ Potsdam Kp / Quicklook</a>
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer" href="https://www.spaceweatherlive.com/">SpaceWeatherLive (Übersicht)</a>
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer" href="https://www.lightpollutionmap.info/">Light Pollution Map (dunkle Spots)</a>
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer" href="https://www.windy.com/">Windy (Wolken/Modelle)</a>
-      </div>
-
-      <div class="text-center text-[10px] text-white/25 mt-4 tracking-[.35em] uppercase font-black">
-        Aurora X • NOAA + GFZ + Open-Meteo + OpenStreetMap • v4
-      </div>
-    </div>
-
+    <div id="uiScoreWhy" class="text-xs text-white/55 mt-2"></div>
   </div>
 
+  <!-- MINI FORECAST -->
+  <div class="grid grid-cols-3 gap-2 mt-5 text-sm">
+    <div class="card p-3">Jetzt<br><b id="fcNow">—</b></div>
+    <div class="card p-3">+30 min<br><b id="fc30">—</b></div>
+    <div class="card p-3">+60 min<br><b id="fc60">—</b></div>
+  </div>
+</div>
+
+<!-- VALUES -->
+<div class="grid grid-cols-2 gap-3">
+  <div class="card p-4">
+    <div class="text-xs text-white/50">Sonnenwind</div>
+    <div class="text-3xl font-black" id="valSpd">--</div>
+    <div class="text-xs text-white/40">km/s</div>
+  </div>
+  <div class="card p-4">
+    <div class="text-xs text-white/50">Bz</div>
+    <div class="text-3xl font-black" id="valBz">--</div>
+    <div class="text-xs text-white/40">nT</div>
+  </div>
+</div>
+
+<!-- WEATHER / MOON -->
+<div class="card p-4">
+  <div class="flex justify-between mb-2">
+    <span class="badge">Wetter & Nacht</span>
+    <span class="badge" id="uiNight">—</span>
+  </div>
+  <div class="grid grid-cols-2 gap-3">
+    <div class="card p-3">
+      Bewölkung<br><b id="valCloud">--</b>
+    </div>
+    <div class="card p-3">
+      Mond<br><b id="valMoon">--</b>
+    </div>
+  </div>
+  <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+    <div>
+      Sonnenuntergang<br><b id="sunset">--:--</b>
+    </div>
+    <div>
+      Sonnenaufgang<br><b id="sunrise">--:--</b>
+    </div>
+  </div>
+</div>
+
+<!-- CHART -->
+<div class="card p-4">
+  <span class="badge mb-2 inline-block">Bz & Speed (~2h)</span>
+  <canvas id="chartMain" height="200"></canvas>
+</div>
+
+</div>
+
 <script>
-  /***********************
-   *  CONFIG / ENDPOINTS
-   ***********************/
-  const NOAA = {
-    // Reliable live “summary” endpoints (fast, mobile-friendly)
-    magSummary: "https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json",
-    spdSummary: "https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json",
-
-    // Trend tables (may be heavier; we filter aggressively)
-    mag1d: "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json",
-    plasma1d: "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json",
-    kp1d: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-1-day.json",
-
-    // Ovation images
-    ovationNH: "https://services.swpc.noaa.gov/images/aurora-forecast-northern-hemisphere.jpg"
-  };
-
-  // free geocoding for autocomplete (no key) — Nominatim usage policy: keep requests reasonable
-  const NOMINATIM = {
-    search: "https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&accept-language=de&q="
-  };
-
-  const OPEN_METEO = {
-    // Current clouds + daily sunrise/sunset + moon illumination
-    // Note: open-meteo can provide daily moonrise/moonset/moon_phase/moon_illumination (availability can vary by endpoint version).
-    url: (lat, lon) =>
-      `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}&current=cloud_cover,is_day&daily=sunrise,sunset,moonrise,moonset,moon_phase,moon_illumination&timezone=auto`
-  };
-
-  // GFZ quicklook image (simple daily file)
-  // If GFZ changes path, swap it here.
-  function gfzQuicklookUrlYYYYMMDD(yyyy_mm_dd){
-    // A widely used pattern is fileadmin/kp-archiv/png/DATE.png
-    // Some GFZ setups use different naming; easiest is to host your own proxy later.
-    return `https://kp.gfz-potsdam.de/fileadmin/kp-archiv/png/${yyyy_mm_dd}.png`;
-  }
-
-  /***********************
-   *  STATE
-   ***********************/
-  let currentLat = 50.83, currentLon = 12.92;
-  let currentPlaceName = "Chemnitz";
-  let chartMain = null, chartKp = null;
-  let map, marker;
-  let acTimer = null;
-  let lastGood = { bz:null, spd:null, kp:null };
-
-  const $ = (id) => document.getElementById(id);
-
-  /***********************
-   *  HELPERS
-   ***********************/
-  function clamp(n, a, b){ return Math.max(a, Math.min(b, n)); }
-  function safeNum(x){
-    const n = Number.parseFloat(x);
-    return Number.isFinite(n) ? n : null;
-  }
-  function hhmmFromISO(s){
-    if(!s) return null;
-    // NOAA uses "YYYY-MM-DD HH:MM:SS.sss"
-    const parts = String(s).split(" ");
-    if(parts.length < 2) return null;
-    return parts[1].slice(0,5);
-  }
-  function fmtTimeLocal(date = new Date()){
-    return date.toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' });
-  }
-
-  async function fetchJson(url, timeoutMs=9000){
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), timeoutMs);
-    try{
-      const res = await fetch(url, { cache:"no-store", signal: ctrl.signal });
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    }catch(e){
-      return null;
-    }finally{
-      clearTimeout(t);
-    }
-  }
-
-  // NOAA tables: find last valid numeric in a column
-  function lastValidRow(table, idx){
-    if(!Array.isArray(table) || table.length < 2) return null;
-    for(let i = table.length - 1; i >= 1; i--){
-      const row = table[i];
-      if(!row) continue;
-      const v = safeNum(row[idx]);
-      if(v !== null) return row;
-    }
-    return null;
-  }
-
-  /***********************
-   *  AUTOCOMPLETE (Nominatim)
-   ***********************/
-  function hideAc(){
-    $("acList").classList.add("hidden");
-    $("acList").innerHTML = "";
-  }
-
-  function showAc(items){
-    const box = $("acList");
-    box.innerHTML = "";
-    if(!items || !items.length){
-      hideAc(); return;
-    }
-    items.forEach(it => {
-      const div = document.createElement("div");
-      div.className = "ac-item";
-      div.textContent = it.display_name;
-      div.onclick = () => {
-        currentLat = Number.parseFloat(it.lat);
-        currentLon = Number.parseFloat(it.lon);
-        currentPlaceName = it.display_name.split(",")[0] || "Ort";
-        $("placeInput").value = currentPlaceName;
-        hideAc();
-        moveMap(currentLat, currentLon, true);
-        updateAll();
-      };
-      box.appendChild(div);
-    });
-    box.classList.remove("hidden");
-  }
-
-  async function acSearch(q){
-    const url = NOMINATIM.search + encodeURIComponent(q);
-    const data = await fetchJson(url, 7000);
-    if(!Array.isArray(data)) return [];
-    return data.map(d => ({
-      display_name: d.display_name,
-      lat: d.lat,
-      lon: d.lon
-    }));
-  }
-
-  /***********************
-   *  MAP
-   ***********************/
-  function moveMap(lat, lon, animate=false){
-    $("uiLat").textContent = Number(lat).toFixed(2);
-    $("uiLon").textContent = Number(lon).toFixed(2);
-
-    if(map && marker){
-      marker.setLatLng([lat, lon]);
-      map.setView([lat, lon], map.getZoom(), { animate });
-    }
-  }
-
-  function setupMap(){
-    map = L.map("map", { zoomControl: false }).setView([currentLat, currentLon], 9);
-
-    // Night map (CARTO Dark Matter)
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; OpenStreetMap &copy; CARTO',
-      subdomains: "abcd",
-      maxZoom: 20
-    }).addTo(map);
-
-    marker = L.marker([currentLat, currentLon], { draggable: true }).addTo(map);
-
-    marker.on("dragend", () => {
-      const p = marker.getLatLng();
-      currentLat = p.lat;
-      currentLon = p.lng;
-      moveMap(currentLat, currentLon);
-      updateAll();
-    });
-  }
-
-  /***********************
-   *  SCORE (0–100) + DECISION
-   ***********************/
-  function computeAuroraScore({ bz, spd, kp, cloud, moonIllum, isNight }){
-    // Baseline from Kp (more important for DE), but keep it "pragmatic"
-    // Kp 0..9 -> 0..70
-    let score = 0;
-    if(kp !== null){
-      score += clamp((kp / 9) * 70, 0, 70);
-    }
-
-    // Bz contribution (southward is good)
-    // bz 0..-20 -> up to +20
-    if(bz !== null){
-      const bzBonus = clamp(((-bz) / 20) * 20, 0, 20);
-      score += bzBonus;
-      // extra kick if very southward
-      if(bz <= -10) score += 6;
-    }
-
-    // Speed contribution
-    // spd 300..800 -> up to +18
-    if(spd !== null){
-      const spdBonus = clamp(((spd - 300) / 500) * 18, 0, 18);
-      score += spdBonus;
-      if(spd >= 600) score += 4;
-    }
-
-    // Night factor (if not night, heavily reduce)
-    if(isNight === false){
-      score *= 0.22;
-    }
-
-    // Clouds reduce visibility strongly
-    if(cloud !== null){
-      const clearFactor = clamp((100 - cloud) / 100, 0, 1);
-      score *= clearFactor;
-    }
-
-    // Moon illumination penalty (0..100)
-    // Full moon can wash out weak aurora. Penalize up to ~18 points.
-    if(moonIllum !== null){
-      const pen = clamp((moonIllum / 100) * 18, 0, 18);
-      score -= pen;
-    }
-
-    score = Math.round(clamp(score, 0, 100));
-
-    // Explanation text
-    const why = [];
-    if(kp !== null) why.push(`Kp ${kp.toFixed(1)}`);
-    if(bz !== null) why.push(`Bz ${bz.toFixed(1)} nT`);
-    if(spd !== null) why.push(`Speed ${Math.round(spd)} km/s`);
-    if(cloud !== null) why.push(`${cloud}% Wolken`);
-    if(moonIllum !== null) why.push(`${moonIllum}% Mondlicht`);
-    if(isNight === false) why.push(`(nicht Nacht)`);
-
-    return { score, why: why.join(" • ") };
-  }
-
-  function decideStatus({ score, bz, spd, cloud, isNight }){
-    const statusEl = $("mainStatus");
-    statusEl.className = "text-6xl font-black tracking-tight";
-
-    // A pragmatic decision that feels like an app:
-    // ALARM if strong conditions and score high
-    const strong = (bz !== null && spd !== null && bz <= -10 && spd >= 520);
-    const veryClear = (cloud !== null && cloud <= 30);
-    const okNight = (isNight !== false);
-
-    if(okNight && (score >= 70 || (strong && veryClear))){
-      statusEl.textContent = "ALARM";
-      statusEl.classList.add("glow-red");
-      $("mainRec").textContent = `RAUS! Hervorragende Werte. Richtung Norden, Langzeitbelichtung. ${cloud !== null ? (cloud <= 30 ? "(Wolken gut!)" : "(Wolken prüfen!)") : ""}`;
-      return;
-    }
-
-    if(okNight && score >= 40){
-      statusEl.textContent = "CHANCE";
-      statusEl.classList.add("glow-yellow");
-      $("mainRec").textContent = "Beobachten! Aktivität erhöht. Kamera bereit halten (Norden), Testshots machen.";
-      return;
-    }
-
-    statusEl.textContent = "RUHIG";
-    statusEl.classList.add("text-white/20");
-    $("mainRec").textContent = okNight ? "Aktuell eher nichts. Später nochmal checken." : "Der Himmel ist (noch) zu hell. Später nochmal checken.";
-  }
-
-  function updateScoreUI(score, why){
-    $("uiScore").textContent = score;
-    $("uiScoreWhy").textContent = why || "—";
-    $("scoreBar").style.width = `${score}%`;
-    // bar color by score
-    const bar = $("scoreBar");
-    bar.className = "h-full";
-    if(score >= 70) bar.classList.add("bg-red-500");
-    else if(score >= 40) bar.classList.add("bg-yellow-500");
-    else bar.classList.add("bg-green-500");
-  }
-
-  /***********************
-   *  CHARTS
-   ***********************/
-  function buildChartBzSpeed(labels, bzArr, spdArr){
-    const ctx = $("chartMain").getContext("2d");
-    if(chartMain) chartMain.destroy();
-
-    chartMain = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [
-          {
-            label: "Bz (nT)",
-            data: bzArr,
-            borderColor: "#3b82f6",
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: .35,
-            yAxisID: "y"
-          },
-          {
-            label: "Speed (km/s)",
-            data: spdArr,
-            borderColor: "#ef4444",
-            borderWidth: 2,
-            pointRadius: 0,
-            tension: .35,
-            yAxisID: "y1"
-          }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {
-          legend: { display: true, labels: { color: "rgba(255,255,255,.7)", boxWidth: 18 } },
-          tooltip: { enabled: true }
-        },
-        scales: {
-          x: {
-            grid: { color: "rgba(255,255,255,.06)" },
-            ticks: { color: "rgba(255,255,255,.55)", maxTicksLimit: 8 }
-          },
-          y: {
-            position: "left",
-            grid: { color: "rgba(255,255,255,.06)" },
-            ticks: { color: "rgba(255,255,255,.55)" }
-          },
-          y1: {
-            position: "right",
-            grid: { display: false },
-            ticks: { color: "rgba(255,255,255,.55)" }
-          }
-        }
-      }
-    });
-  }
-
-  function kpColor(v){
-    if(v === null) return "rgba(255,255,255,.10)";
-    if(v >= 7) return "rgba(239,68,68,.85)";     // rot
-    if(v >= 5) return "rgba(245,158,11,.85)";    // gelb
-    return "rgba(34,197,94,.65)";                // grün
-  }
-
-  function buildChartKp(labels, values){
-    const ctx = $("chartKp").getContext("2d");
-    if(chartKp) chartKp.destroy();
-
-    chartKp = new Chart(ctx, {
-      type: "bar",
-      data: {
-        labels,
-        datasets: [{
-          label: "Kp",
-          data: values,
-          backgroundColor: values.map(kpColor),
-          borderWidth: 0,
-          borderRadius: 8
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { enabled: true }
-        },
-        scales: {
-          x: {
-            grid: { color: "rgba(255,255,255,.05)" },
-            ticks: { color: "rgba(255,255,255,.55)", maxTicksLimit: 10 }
-          },
-          y: {
-            suggestedMin: 0,
-            suggestedMax: 9,
-            grid: { color: "rgba(255,255,255,.06)" },
-            ticks: { color: "rgba(255,255,255,.55)" }
-          }
-        }
-      }
-    });
-  }
-
-  /***********************
-   *  OVATION + GFZ
-   ***********************/
-  function refreshOvation(){
-    $("ovationFallback").classList.add("hidden");
-    const ts = Date.now();
-    const src = `${NOAA.ovationNH}?ts=${ts}`;
-    const g = $("ovationGlobal");
-    const e = $("ovationEurope");
-
-    g.onerror = () => $("ovationFallback").classList.remove("hidden");
-    e.onerror = () => $("ovationFallback").classList.remove("hidden");
-
-    g.src = src;
-    e.src = src; // same image, cropped by CSS for “Europe zoom”
-
-    $("ovaTime").textContent = fmtTimeLocal();
-  }
-
-  function refreshGFZ(){
-    const d = new Date();
-    const yyyy_mm_dd = d.toISOString().slice(0,10);
-    const url = gfzQuicklookUrlYYYYMMDD(yyyy_mm_dd) + `?ts=${Date.now()}`;
-    const img = $("gfzImg");
-    img.onerror = () => {
-      // if path ever changes, show a helpful message by swapping alt text
-      img.removeAttribute("src");
-      img.alt = "GFZ Quicklook aktuell nicht erreichbar (Pfad/Server).";
-    };
-    img.src = url;
-  }
-
-  /***********************
-   *  MAIN UPDATE PIPELINE
-   ***********************/
-  async function updateAll(){
-    $("badgeLive").textContent = "lade…";
-    $("badgeLive").className = "badge";
-
-    moveMap(currentLat, currentLon);
-
-    // 1) FAST LIVE VALUES (summary endpoints)
-    const [magSum, spdSum] = await Promise.all([
-      fetchJson(NOAA.magSummary, 8000),
-      fetchJson(NOAA.spdSummary, 8000)
-    ]);
-
-    let bz = null, spd = null;
-
-    // mag summary often: { bz: "...", ... } OR { "bz": -5.1 } depending
-    if(magSum && typeof magSum === "object"){
-      bz = safeNum(magSum.bz ?? magSum.Bz ?? magSum.bz_gsm);
-    }
-    if(spdSum && typeof spdSum === "object"){
-      spd = safeNum(spdSum.wind_speed ?? spdSum.speed ?? spdSum.WindSpeed);
-    }
-
-    // 2) KPI / TREND TABLES (robust, filtered)
-    const [mag1d, plasma1d, kp1d] = await Promise.all([
-      fetchJson(NOAA.mag1d, 12000),
-      fetchJson(NOAA.plasma1d, 12000),
-      fetchJson(NOAA.kp1d, 12000)
-    ]);
-
-    // Kp last valid
-    let kp = null;
-    if(Array.isArray(kp1d)){
-      const last = lastValidRow(kp1d, 1);
-      kp = last ? safeNum(last[1]) : null;
-      // fallback: sometimes last line partially empty
-      if(kp === null && kp1d.length > 2){
-        kp = safeNum(kp1d[kp1d.length - 2]?.[1]);
-      }
-    }
-
-    // If summary failed, fall back to last valid from tables:
-    if(bz === null && Array.isArray(mag1d)){
-      const last = lastValidRow(mag1d, 3);
-      bz = last ? safeNum(last[3]) : null;
-    }
-    if(spd === null && Array.isArray(plasma1d)){
-      const last = lastValidRow(plasma1d, 2);
-      spd = last ? safeNum(last[2]) : null;
-    }
-
-    // Save last good values
-    if(bz !== null) lastGood.bz = bz;
-    if(spd !== null) lastGood.spd = spd;
-    if(kp !== null) lastGood.kp = kp;
-
-    // 3) WEATHER + MOON (Open-Meteo)
-    const wx = await fetchJson(OPEN_METEO.url(currentLat, currentLon), 9000);
-    const cloud = safeNum(wx?.current?.cloud_cover);
-    const isDay = wx?.current?.is_day; // 0/1
-    const isNight = (isDay === 0);
-
-    const sunrise = wx?.daily?.sunrise?.[0] ? String(wx.daily.sunrise[0]).slice(11,16) : null;
-    const sunset  = wx?.daily?.sunset?.[0]  ? String(wx.daily.sunset[0]).slice(11,16)  : null;
-
-    // moon illumination in %
-    let moonIllum = null;
-    if(Array.isArray(wx?.daily?.moon_illumination)){
-      moonIllum = safeNum(wx.daily.moon_illumination[0]);
-    }
-
-    // 4) UI values
-    $("valBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
-    $("valSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
-    $("chipBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
-    $("chipSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
-    $("chipKp").textContent = (kp !== null) ? kp.toFixed(1) : "--";
-    $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
-    $("chipMoon").textContent = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
-
-    $("valCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
-    $("valCloudTxt").textContent = (cloud === null) ? "—" : (cloud > 80 ? "Bewölkt ☁️" : cloud > 35 ? "Teils klar ⛅" : "Klar 🌙");
-
-    $("valMoon").textContent = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
-    $("valMoonTxt").textContent = (moonIllum === null) ? "—" : (moonIllum > 70 ? "hell (Vollmondnähe)" : moonIllum > 30 ? "mittel" : "dunkel (top)");
-
-    $("sunrise").textContent = sunrise || "--:--";
-    $("sunset").textContent = sunset || "--:--";
-    $("uiNight").textContent = isNight ? "Nacht" : "Tag/Dämmerung";
-
-    $("uiLat").textContent = Number(currentLat).toFixed(2);
-    $("uiLon").textContent = Number(currentLon).toFixed(2);
-
-    $("uiUpdated").textContent = fmtTimeLocal();
-
-    // Live badge
-    const liveOk = (bz !== null || spd !== null || kp !== null);
-    $("badgeLive").textContent = liveOk ? "live" : "offline";
-    if(liveOk) $("badgeLive").classList.add("glow-green");
-
-    // 5) Score + Decision
-    const scorePack = computeAuroraScore({ bz, spd, kp, cloud, moonIllum, isNight });
-    updateScoreUI(scorePack.score, scorePack.why);
-    decideStatus({ score: scorePack.score, bz, spd, cloud, isNight });
-
-    // 6) Trend chart (null gaps to kill “Zacken”)
-    renderTrendChart(mag1d, plasma1d);
-
-    // 7) Kp bar chart (colors)
-    renderKpChart(kp1d);
-
-    // 8) GFZ + Ovation
-    refreshGFZ();
-    refreshOvation();
-  }
-
-  function renderTrendChart(mag, plasma){
-    if(!Array.isArray(mag) || !Array.isArray(plasma)) return;
-
-    // take last ~120 points (roughly last 2h if 1-min cadence)
-    const magSlice = mag.slice(-140);
-    const plSlice  = plasma.slice(-140);
-
-    const labels = [];
-    const bzArr  = [];
-    const spdArr = [];
-
-    // Align by index (good enough for “quick feel”), but skip invalid -> null
-    const len = Math.min(magSlice.length, plSlice.length);
-
-    for(let i=0; i<len; i++){
-      const m = magSlice[i];
-      const p = plSlice[i];
-
-      const t = hhmmFromISO(m?.[0]) || hhmmFromISO(p?.[0]) || null;
-      if(!t) continue;
-
-      const bzVal = safeNum(m?.[3]);
-      const spVal = safeNum(p?.[2]);
-
-      labels.push(t);
-      // Key trick: invalid becomes null (Chart.js draws gaps instead of falling to 0)
-      bzArr.push(Number.isFinite(bzVal) ? bzVal : null);
-      spdArr.push(Number.isFinite(spVal) ? spVal : null);
-    }
-
-    // keep chart readable
-    const maxPoints = 80;
-    const cut = labels.length > maxPoints ? labels.length - maxPoints : 0;
-
-    buildChartBzSpeed(labels.slice(cut), bzArr.slice(cut), spdArr.slice(cut));
-  }
-
-  function renderKpChart(kpTable){
-    if(!Array.isArray(kpTable) || kpTable.length < 3) return;
-
-    // kpTable format: [header, [time, kp, ...], ...]
-    // take last 24h-ish: last ~16 points (3h intervals => 8 points/day, but NOAA file can include more)
-    const rows = kpTable.slice(1).slice(-16);
-
-    const labels = [];
-    const values = [];
-
-    rows.forEach(r => {
-      const t = hhmmFromISO(r?.[0]) || (String(r?.[0]||"").slice(11,16));
-      const v = safeNum(r?.[1]);
-      if(!t) return;
-      labels.push(t);
-      values.push(Number.isFinite(v) ? v : null);
-    });
-
-    // keep only last 12 bars
-    const maxBars = 12;
-    const cut = labels.length > maxBars ? labels.length - maxBars : 0;
-
-    buildChartKp(labels.slice(cut), values.slice(cut));
-  }
-
-  /***********************
-   *  EVENTS
-   ***********************/
-  $("btnUpdate").addEventListener("click", () => updateAll());
-
-  $("btnGPS").addEventListener("click", () => {
-    if(!navigator.geolocation){
-      alert("GPS nicht verfügbar.");
-      return;
-    }
-    $("badgeLive").textContent = "gps…";
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        currentLat = pos.coords.latitude;
-        currentLon = pos.coords.longitude;
-        currentPlaceName = "Standort";
-        $("placeInput").value = "";
-        hideAc();
-        moveMap(currentLat, currentLon, true);
-        updateAll();
-      },
-      () => {
-        alert("Ortung abgelehnt oder fehlgeschlagen.");
-        $("badgeLive").textContent = "offline";
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  });
-
-  $("btnOvaRefresh").addEventListener("click", () => refreshOvation());
-
-  $("placeInput").addEventListener("input", (e) => {
-    const q = e.target.value.trim();
-    clearTimeout(acTimer);
-
-    if(q.length < 3){
-      hideAc();
-      return;
-    }
-    acTimer = setTimeout(async () => {
-      const items = await acSearch(q);
-      showAc(items);
-    }, 280);
-  });
-
-  // close autocomplete on outside click
-  document.addEventListener("click", (e) => {
-    const ac = $("placeInput");
-    const list = $("acList");
-    if(e.target !== ac && !list.contains(e.target)) hideAc();
-  });
-
-  /***********************
-   *  INIT
-   ***********************/
-  function init(){
-    moveMap(currentLat, currentLon);
-    setupMap();
-    refreshOvation();
-    refreshGFZ();
-    updateAll();
-    // auto-update each minute
-    setInterval(updateAll, 60000);
-  }
-
-  init();
+/* ---------- HELPERS ---------- */
+const $ = id => document.getElementById(id);
+const clamp=(n,a,b)=>Math.max(a,Math.min(b,n));
+const timeFromISO=i=>i?new Date(i).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}):null;
+
+/* ---------- MAP ---------- */
+let map=L.map("map").setView([50.83,12.92],6);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{subdomains:"abcd"}).addTo(map);
+let marker=L.marker([50.83,12.92],{draggable:true}).addTo(map);
+
+/* Kp Schwellen */
+L.circle([63,10],{radius:1200000,color:"#f59e0b",fill:false}).addTo(map);
+L.circle([68,10],{radius:800000,color:"#ef4444",fill:false}).addTo(map);
+
+/* ---------- DATA ---------- */
+async function fetchJson(u){try{return await (await fetch(u)).json()}catch{return null}}
+
+/* ---------- MAIN ---------- */
+async function update(){
+  $("badgeLive").textContent="live";
+
+  const mag=await fetchJson("https://services.swpc.noaa.gov/products/summary/solar-wind-mag-field.json");
+  const spd=await fetchJson("https://services.swpc.noaa.gov/products/summary/solar-wind-speed.json");
+
+  const bz=Number(mag?.bz ?? null);
+  const speed=Number(spd?.wind_speed ?? null);
+
+  $("valBz").textContent=bz?.toFixed(1)||"--";
+  $("valSpd").textContent=Math.round(speed)||"--";
+
+  const wx=await fetchJson(`https://api.open-meteo.com/v1/forecast?latitude=50.83&longitude=12.92&current=cloud_cover,is_day&daily=sunrise,sunset,moon_illumination&timezone=auto`);
+  const cloud=wx?.current?.cloud_cover;
+  const night=wx?.current?.is_day===0;
+
+  $("valCloud").textContent=cloud!=null?cloud+"%":"--";
+  $("valMoon").textContent=wx?.daily?.moon_illumination?.[0]!=null?Math.round(wx.daily.moon_illumination[0])+"%":"--";
+  $("sunrise").textContent=timeFromISO(wx?.daily?.sunrise?.[0])||"--:--";
+  $("sunset").textContent=timeFromISO(wx?.daily?.sunset?.[0])||"--:--";
+  $("uiNight").textContent=night?"Nacht":"Tag";
+
+  /* SCORE */
+  let score=0;
+  if(bz<0)score+=(-bz)*3;
+  if(speed>400)score+=(speed-400)/8;
+  if(!night)score*=0.25;
+  if(cloud!=null)score*=(100-cloud)/100;
+  score=Math.round(clamp(score,0,100));
+
+  $("uiScore").textContent=score;
+  $("fcNow").textContent=score;
+  $("fc30").textContent=clamp(score+6,0,100);
+  $("fc60").textContent=clamp(score+10,0,100);
+  $("scoreBar").style.width=score+"%";
+  $("uiScoreWhy").textContent=`Bz ${bz?.toFixed(1)} • Speed ${Math.round(speed)} • ${night?"Nacht":"Tag"}`;
+
+  const st=$("mainStatus");
+  st.className="text-6xl font-black";
+  if(score>70){st.textContent="ALARM";st.classList.add("glow-red");$("mainRec").textContent="Raus! Sehr gute Bedingungen."}
+  else if(score>40){st.textContent="CHANCE";st.classList.add("glow-yellow");$("mainRec").textContent="Beobachten, Kamera bereit."}
+  else{st.textContent="RUHIG";$("mainRec").textContent="Aktuell eher nichts."}
+}
+
+update();
+setInterval(update,60000);
 </script>
 </body>
 </html>
