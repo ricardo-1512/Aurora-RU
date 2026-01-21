@@ -1090,44 +1090,40 @@ function renderTrendChart(mag, plasma){
   buildChartBzSpeed(labels.slice(cut), bzArr.slice(cut), spdArr.slice(cut));
 }
 
-function renderKpChart(kpTable){
-  // NOAA Kp: meistens Array (Header + Daten)
-  if(!Array.isArray(kpTable) || kpTable.length < 3){
-    $("kpInfo").textContent = "Kp: keine Daten (NOAA nicht erreichbar).";
-    return { lastKp: null, diag: "Kp: keine Daten" };
+function renderKpChart(kpTable) {
+  if (!Array.isArray(kpTable) || kpTable.length < 2) {
+    setDiag("kpDiag", "Kp Daten leer");
+    $("kpInfo").textContent = "Kp: keine Daten";
+    return { lastKp: null, diag: "Kp leer" };
   }
 
-  const rows = kpTable.slice(1).slice(-32); // mehr reinholen, wir cutten später
-  const labels=[], values=[];
-  let validCount = 0;
+  // Header/Strings raus: wir behalten nur Zeilen, deren [0] ein parsebares Datum ist
+  const dataRows = kpTable
+    .filter(r => Array.isArray(r) && r.length >= 2)
+    .filter(r => r[0] && !Number.isNaN(Date.parse(r[0])));
 
-  rows.forEach(r => {
-    // Format ist i.d.R: [time_tag, kp, ...] – kp liegt an Index 1
-    const t = extractHHMM(r?.[0]);
-    const v = safeNum(r?.[1]);
-    if(!t) return;
+  if (dataRows.length < 2) {
+    setDiag("kpDiag", "Kp: nur Header/keine Datensätze");
+    $("kpInfo").textContent = "Kp: keine nutzbaren Daten";
+    return { lastKp: null, diag: "Kp header only" };
+  }
 
-    labels.push(t);
-    values.push(v !== null ? v : null);
-    if(v !== null) validCount++;
+  const slice = dataRows.slice(-12);
+  const labels = slice.map(r => extractHHMM(r[0]) || "—");
+  const values = slice.map(r => {
+    const v = Number(r[1]);
+    return Number.isFinite(v) ? v : null;
   });
 
-  const maxBars = 12;
-  const cut = labels.length > maxBars ? labels.length - maxBars : 0;
-  const L = labels.slice(cut);
-  const V = values.slice(cut);
+  buildChartKp(labels, values);
 
-  buildChartKp(L, V);
+  const lastKp = [...values].reverse().find(v => v !== null);
+  $("kpInfo").textContent = (lastKp !== undefined && lastKp !== null)
+    ? `Aktueller Kp: ${lastKp}`
+    : "Aktueller Kp: —";
 
-  const lastV = [...values].reverse().find(x => x !== null);
-  $("kpInfo").textContent = (validCount > 0)
-    ? `Letzter Kp-Wert: ${lastV !== undefined ? lastV : "—"}`
-    : "Kp: Daten kamen an, aber ohne Werte (NOAA liefert teils Lücken).";
-
-  return {
-    lastKp: (typeof lastV === "number" ? lastV : null),
-    diag: `Kp ok • Samples: ${validCount}/${values.length}`
-  };
+  const valid = values.filter(v => v !== null).length;
+  return { lastKp: (lastKp ?? null), diag: `Kp: OK (${valid}/${values.length})` };
 }
 
 /***********************
@@ -1220,101 +1216,99 @@ async function updateAll(){
   }
 
   // 3) Weather (robust + fallback)
-  let cloud = null, moonIllum = null, isNight = null;
-  let wx = await fetchJson(OPEN_METEO.url(currentLat, currentLon), 14000);
+  // --- WETTER (Open-Meteo) — robust & simpel ---
+let cloud = null, moonIllum = null, isNight = null;
 
-  // fallback attempt (hourly cloud)
-  if(isErr(wx)){
-    const fallbackUrl =
-      `https://api.open-meteo.com/v1/forecast` +
-      `?latitude=${encodeURIComponent(currentLat)}` +
-      `&longitude=${encodeURIComponent(currentLon)}` +
-      `&hourly=cloud_cover` +
-      `&daily=sunrise,sunset,moon_illumination` +
-      `&forecast_days=1` +
-      `&timezone=auto`;
-    wx = await fetchJson(fallbackUrl, 14000);
+// Explizite URL (ohne forecast_days, damit weniger Fehlerquellen)
+const wxUrl =
+  `https://api.open-meteo.com/v1/forecast` +
+  `?latitude=${encodeURIComponent(currentLat)}` +
+  `&longitude=${encodeURIComponent(currentLon)}` +
+  `&current=cloud_cover,is_day` +
+  `&daily=sunrise,sunset,moon_illumination` +
+  `&timezone=auto`;
+
+const wx = await fetchJson(wxUrl, 12000);
+
+if (isErr(wx)) {
+  setWeatherUnavailable(`Wetter Fehler: ${wx.status || ""} ${wx.statusText || wx.message || ""}`.trim());
+} else {
+  // Werte aus current
+  cloud = (wx?.current?.cloud_cover ?? null);
+  cloud = (cloud === null) ? null : Number(cloud);
+  if (!Number.isFinite(cloud)) cloud = null;
+
+  const isDayRaw = wx?.current?.is_day;
+  // is_day ist 0/1 (kann aber auch undefined sein)
+  if (isDayRaw === 0) isNight = true;
+  else if (isDayRaw === 1) isNight = false;
+  else isNight = null;
+
+  // Daily (Sonne/Mond)
+  const sr = wx?.daily?.sunrise?.[0] ?? null;
+  const ss = wx?.daily?.sunset?.[0] ?? null;
+
+  $("sunrise").textContent = extractHHMM(sr) || "--:--";
+  $("sunset").textContent  = extractHHMM(ss) || "--:--";
+
+  moonIllum = wx?.daily?.moon_illumination?.[0] ?? null;
+  moonIllum = (moonIllum === null) ? null : Number(moonIllum);
+  if (!Number.isFinite(moonIllum)) moonIllum = null;
+
+  // Open-Meteo moon_illumination ist typischerweise 0..1 oder 0..100 → normalisieren
+  if (moonIllum !== null && moonIllum <= 1.01) moonIllum *= 100;
+  if (moonIllum !== null) moonIllum = clamp(moonIllum, 0, 100);
+
+  // Chips & Cards
+  $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
+  $("valCloud").textContent  = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
+
+  $("chipMoon").textContent = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
+  $("valMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
+
+  // Icons/Text
+  if (cloud === null) {
+    $("icoCloud").textContent = "☁️";
+    $("valCloudTxt").textContent = "—";
+  } else if (cloud > 70) {
+    $("icoCloud").textContent = "☁️";
+    $("valCloudTxt").textContent = "Bewölkt";
+  } else if (cloud > 20) {
+    $("icoCloud").textContent = "⛅";
+    $("valCloudTxt").textContent = "Teils klar";
+  } else {
+    $("icoCloud").textContent = "✨";
+    $("valCloudTxt").textContent = "Klar";
   }
 
-  if(isErr(wx)){
-    setWeatherUnavailable(`Wetter Fehler: ${wx.status || ""} ${wx.statusText || wx.message || ""}`.trim());
-  }else{
-    // Cloud
-    cloud = safeNum(wx?.current?.cloud_cover);
-    if(cloud === null && Array.isArray(wx?.hourly?.cloud_cover)){
-      cloud = safeNum(wx.hourly.cloud_cover[0]);
-    }
-
-    // Day/Night
-    const isDay = wx?.current?.is_day; // 0/1 oder undefined
-    isNight = (isDay === 0) ? true : (isDay === 1 ? false : null);
-
-    // sunrise/sunset
-    const sunriseISO = wx?.daily?.sunrise?.[0] ?? null;
-    const sunsetISO  = wx?.daily?.sunset?.[0] ?? null;
-    const sunrise = extractHHMM(sunriseISO);
-    const sunset  = extractHHMM(sunsetISO);
-
-    // moon illum
-    if(Array.isArray(wx?.daily?.moon_illumination)){
-      moonIllum = safeNum(wx.daily.moon_illumination[0]);
-      if(moonIllum !== null && moonIllum <= 1.01) moonIllum *= 100;
-      moonIllum = clamp(moonIllum, 0, 100);
-    }
-
-    // UI: chips
-    $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
-    $("chipMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
-
-    // UI: weather cards
-    $("valCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
-    $("valMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
-
-    if(cloud === null){
-      $("valCloudTxt").textContent = "—";
-      $("icoCloud").textContent = "☁️";
-    }else if(cloud > 80){
-      $("valCloudTxt").textContent = "Bewölkt";
-      $("icoCloud").textContent = "☁️";
-    }else if(cloud > 35){
-      $("valCloudTxt").textContent = "Teils klar";
-      $("icoCloud").textContent = "⛅";
-    }else{
-      $("valCloudTxt").textContent = "Klar";
-      $("icoCloud").textContent = "🌙";
-    }
-
-    if(moonIllum === null){
-      $("valMoonTxt").textContent = "—";
-      $("icoMoon").textContent = "🌙";
-    }else if(moonIllum > 75){
-      $("valMoonTxt").textContent = "Hell";
-      $("icoMoon").textContent = "🌕";
-    }else if(moonIllum > 35){
-      $("valMoonTxt").textContent = "Mittel";
-      $("icoMoon").textContent = "🌓";
-    }else{
-      $("valMoonTxt").textContent = "Dunkel (top)";
-      $("icoMoon").textContent = "🌙";
-    }
-
-    $("sunrise").textContent = sunrise || "--:--";
-    $("sunset").textContent  = sunset  || "--:--";
-
-    if(isNight === true){
-      $("uiNight").textContent = "Nacht";
-      $("tagDayNight").textContent = "Nacht";
-    }else if(isNight === false){
-      $("uiNight").textContent = "Tag/Dämmerung";
-      $("tagDayNight").textContent = "Tag/Dämmerung";
-    }else{
-      $("uiNight").textContent = "—";
-      $("tagDayNight").textContent = "—";
-    }
-
-    // Diagnostics
-    setDiag("wxDiag", "Wetter: ok");
+  if (moonIllum === null) {
+    $("icoMoon").textContent = "🌙";
+    $("valMoonTxt").textContent = "—";
+  } else if (moonIllum > 75) {
+    $("icoMoon").textContent = "🌕";
+    $("valMoonTxt").textContent = "Hell";
+  } else if (moonIllum > 35) {
+    $("icoMoon").textContent = "🌓";
+    $("valMoonTxt").textContent = "Mittel";
+  } else {
+    $("icoMoon").textContent = "🌙";
+    $("valMoonTxt").textContent = "Dunkel (top)";
   }
+
+  // Tag/Nacht Tags
+  if (isNight === true) {
+    $("tagDayNight").textContent = "NACHT";
+    $("uiNight").textContent = "Nacht";
+  } else if (isNight === false) {
+    $("tagDayNight").textContent = "TAG/DÄMMERUNG";
+    $("uiNight").textContent = "Tag/Dämmerung";
+  } else {
+    $("tagDayNight").textContent = "—";
+    $("uiNight").textContent = "—";
+  }
+
+  setDiag("wxDiag", "Wetter: OK");
+}
 
   // 4) Fill solarwind UI
   $("valBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
