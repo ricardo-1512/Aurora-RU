@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AURORA X — v5 (Fixes • Day/Night • Score • GFZ • Ovation)</title>
+  <title>AURORA X — v6 (Legend • Solar Elevation • Bz Trend • Lat Factor • Map Overlay)</title>
 
   <!-- UI -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -16,9 +16,6 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 
   <style>
-    /* =========================
-       THEME (System + Toggle)
-    ========================== */
     :root{
       --bg:#070707;
       --card: rgba(255,255,255,.035);
@@ -38,7 +35,6 @@
       --tabbd: rgba(255,255,255,.10);
     }
 
-    /* Light theme variables */
     @media (prefers-color-scheme: light){
       html[data-theme="system"]{
         --bg:#f3f4f6;
@@ -79,10 +75,6 @@
       --tabbd: rgba(0,0,0,.10);
     }
 
-    html[data-theme="dark"]{
-      /* keep defaults */
-    }
-
     html,body{
       background:var(--bg);
       color:var(--text);
@@ -118,6 +110,7 @@
       align-items: center;
       gap: .35rem;
       white-space: nowrap;
+      max-width: 100%;
     }
 
     .input{
@@ -143,29 +136,31 @@
       transition: transform .08s ease, filter .2s ease;
       user-select: none;
       border: 1px solid rgba(127,127,127,.18);
+      display: inline-flex;
+      align-items: center;
+      justify-content: flex-start;
+      gap: 10px;
+      width: 100%;
     }
     .btn:active{ transform: translateY(1px) scale(.99); }
-    .btn-primary{ background: #22c55e; color:#052e16; border-color: rgba(34,197,94,.55); }
+    .btn-primary{ background: #22c55e; color:#052e16; border-color: rgba(34,197,94,.55); justify-content:center; }
     .btn-ghost{ background: rgba(255,255,255,.10); color: var(--title); }
-    .btn-mini{ padding: 10px 12px; font-size: 10px; border-radius: 999px; }
+    .btn-mini{ padding: 10px 12px; font-size: 10px; border-radius: 999px; width:auto; justify-content:center; }
 
     .glow-red{ color:#ef4444; text-shadow: 0 0 24px rgba(239,68,68,.35); }
     .glow-yellow{ color:#f59e0b; text-shadow: 0 0 24px rgba(245,158,11,.25); }
     .glow-green{ color:#22c55e; text-shadow: 0 0 24px rgba(34,197,94,.25); }
 
-    /* Map */
     #map{
-      height: 260px;
+      height: 300px;
       border-radius: 16px;
       border: 1px solid rgba(127,127,127,.18);
       overflow: hidden;
     }
 
-    /* Charts */
     .chart-wrap{ height: 220px; width:100%; position: relative; }
     canvas{ max-width: 100% !important; }
 
-    /* Autocomplete */
     .ac{ position: relative; }
     .ac-list{
       position:absolute;
@@ -193,7 +188,6 @@
     .ac-item:first-child{ border-top:none; }
     .ac-item:hover{ background: rgba(127,127,127,.10); }
 
-    /* Images (GFZ / Ovation) */
     .img-frame{
       border-radius: 16px;
       border: 1px solid rgba(127,127,127,.18);
@@ -210,7 +204,6 @@
       display:block;
     }
 
-    /* Bottom Tabs */
     .tabs{
       position: fixed;
       left: 0; right: 0;
@@ -246,11 +239,8 @@
       border-color: rgba(34,197,94,.40);
       color: var(--title);
     }
-
-    /* spacing for bottom tabs */
     .pb-tabs{ padding-bottom: 92px; }
 
-    /* Threshold pills */
     .th-row{
       display:flex; align-items:flex-start; gap:10px;
       padding: 10px 12px;
@@ -261,13 +251,36 @@
     .dot{
       width: 12px; height:12px; border-radius:999px; margin-top: 4px;
       box-shadow: 0 0 0 4px rgba(127,127,127,.12);
+      flex: 0 0 auto;
     }
+    .dot.gray{ background:#9ca3af; box-shadow:0 0 0 4px rgba(156,163,175,.14); }
     .dot.green{ background:#22c55e; box-shadow:0 0 0 4px rgba(34,197,94,.14); }
     .dot.yellow{ background:#f59e0b; box-shadow:0 0 0 4px rgba(245,158,11,.14); }
     .dot.red{ background:#ef4444; box-shadow:0 0 0 4px rgba(239,68,68,.14); }
 
     .muted{ color: var(--muted); }
     .muted2{ color: var(--muted2); }
+
+    .link-title{ font-weight: 900; letter-spacing: .08em; text-transform: none; }
+    .link-sub{ font-size: 11px; letter-spacing: .02em; opacity:.75; font-weight:600; }
+
+    .toggle-row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+      justify-content:space-between;
+    }
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      border:1px solid rgba(127,127,127,.18);
+      border-radius:999px;
+      padding:10px 12px;
+      background: rgba(127,127,127,.10);
+      font-size: 12px;
+      color: var(--title);
+      user-select:none;
+    }
   </style>
 </head>
 
@@ -275,12 +288,14 @@
   <div class="max-w-2xl mx-auto">
 
     <!-- =========================
-         HEADER (JETZT)
+         HEADER / BANNER
     ========================== -->
     <section id="secNow" class="glass rounded-2xl p-5 mb-4">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <h1 class="text-xl font-black tracking-tight" style="color:var(--title)">AURORA <span class="text-green-500">X</span></h1>
+          <h1 class="text-xl font-black tracking-tight" style="color:var(--title)">
+            AURORA <span class="text-green-500">X</span>
+          </h1>
           <div class="flex flex-wrap gap-2 mt-2">
             <span class="badge" id="badgeLive">offline</span>
             <span class="badge">LAT: <span class="mono" id="uiLat">--</span></span>
@@ -299,34 +314,81 @@
         </div>
       </div>
 
-      <!-- Place + Update -->
-      <div class="mt-4 grid grid-cols-1 gap-3">
+      <div class="mt-4 text-xs muted">
+        Tipp: Pin auf einen dunklen Spot ziehen → Wolken prüfen → Testshots (Norden).
+      </div>
+    </section>
+
+    <!-- =========================
+         ORT + KARTE (in einem Feld) + OVERLAYS
+    ========================== -->
+    <section id="secMap" class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <div class="text-[10px] uppercase font-black tracking-[.25em] muted">Ort & Karte</div>
+        <span class="badge" id="mapModeBadge">Night Map</span>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 mb-3">
         <div class="ac">
           <input id="placeInput" class="input w-full text-sm" placeholder="Ort suchen (z. B. Chemnitz, Leipzig, Berlin) …" autocomplete="off">
           <div id="acList" class="ac-list hidden"></div>
         </div>
 
-        <button class="btn btn-primary w-full" id="btnUpdate">Update</button>
+        <button class="btn btn-primary" id="btnUpdate">Update</button>
+
+        <div class="toggle-row">
+          <div class="pill">
+            <input id="tglAuroraOverlay" type="checkbox" checked style="accent-color:#22c55e">
+            <label for="tglAuroraOverlay">Aurora-Overlay</label>
+          </div>
+          <div class="pill">
+            <input id="tglTerminator" type="checkbox" checked style="accent-color:#22c55e">
+            <label for="tglTerminator">Nachtgrenze</label>
+          </div>
+        </div>
 
         <div class="text-xs muted">
-          Tipp: Pin auf einen dunklen Spot ziehen → dort Wolken prüfen.
+          Interaktiv: Ziehen/Zoomen. Rotation wie „Google Earth“ braucht WebGL (z. B. Cesium).
         </div>
-      </div>
-    </section>
-
-    <!-- =========================
-         KARTE (oben!) + SCHWELLEN
-    ========================== -->
-    <section id="secMap" class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <div class="text-[10px] uppercase font-black tracking-[.25em] muted">Karte</div>
-        <span class="badge" id="mapModeBadge">Night Map</span>
       </div>
 
       <div id="map"></div>
+    </section>
 
-      <!-- Threshold card directly under map -->
-      <div class="card p-4 mt-3">
+    <!-- =========================
+         DECISION + SCORE + LEGEND (Schwellen hier!)
+    ========================== -->
+    <section class="card p-8 text-center mb-4">
+      <div class="badge mx-auto mb-4">Geh ich raus?</div>
+
+      <div id="mainStatus" class="text-6xl font-black tracking-tight" style="color:var(--title)">ANALYSE</div>
+      <div class="mt-2 text-sm italic muted px-2" id="mainRec">Daten werden geladen …</div>
+
+      <div class="mt-6">
+        <div class="flex items-center justify-center gap-2 mb-3 flex-wrap">
+          <span class="badge">Aurora-Score</span>
+          <span class="text-3xl font-black mono" id="uiScore" style="color:var(--title)">--</span>
+          <span class="text-sm muted">/ 100</span>
+        </div>
+
+        <div class="h-2 w-full bg-black/10 rounded-full overflow-hidden" style="border:1px solid rgba(127,127,127,.18)">
+          <div id="scoreBar" class="h-full" style="width:0%"></div>
+        </div>
+
+        <div class="mt-3 text-[12px] muted" id="uiScoreWhy">—</div>
+      </div>
+
+      <div class="flex flex-wrap justify-center gap-2 mt-7">
+        <span class="badge">Bz: <span id="chipBz" class="mono">--</span><span id="chipBzTrend" class="mono"> </span> nT</span>
+        <span class="badge">Speed: <span id="chipSpd" class="mono">--</span> km/s</span>
+        <span class="badge">Kp: <span id="chipKp" class="mono">--</span></span>
+        <span class="badge">Wolken: <span id="chipCloud" class="mono">--</span></span>
+        <span class="badge">Mond: <span id="chipMoon" class="mono">--</span></span>
+        <span class="badge" id="uiNight">—</span>
+      </div>
+
+      <!-- Schwellen LEGEND (inkl. RUHIG) -->
+      <div class="card p-4 mt-6 text-left">
         <div class="flex items-center justify-between mb-2">
           <div class="text-[10px] uppercase font-black tracking-[.25em] muted">Schwellen (DE-Richtwerte)</div>
           <span class="badge">kurz & klar</span>
@@ -334,17 +396,27 @@
 
         <div class="grid gap-2">
           <div class="th-row">
-            <div class="dot green"></div>
+            <div class="dot gray"></div>
             <div>
-              <div class="font-black" style="color:var(--title)">CHANCE</div>
+              <div class="font-black" style="color:var(--title)">RUHIG</div>
               <div class="text-sm muted">
-                Nacht + halbwegs klar (Wolken ≤ 60%) und <span class="mono">Kp ≥ 4</span> <span class="muted2">oder</span> <span class="mono">Bz ≤ -6</span>
+                Himmel zu hell <span class="muted2">oder</span> Werte/Wolken aktuell unpraktisch → später erneut prüfen.
               </div>
             </div>
           </div>
 
           <div class="th-row">
             <div class="dot yellow"></div>
+            <div>
+              <div class="font-black" style="color:var(--title)">CHANCE</div>
+              <div class="text-sm muted">
+                Dunkel genug + halbwegs klar und <span class="mono">Kp ≥ 4</span> <span class="muted2">oder</span> <span class="mono">Bz ≤ -6</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="th-row">
+            <div class="dot green"></div>
             <div>
               <div class="font-black" style="color:var(--title)">GUT</div>
               <div class="text-sm muted">
@@ -365,42 +437,8 @@
         </div>
 
         <div class="text-[12px] muted mt-3">
-          Wichtig: In Deutschland sind <b>Nacht + klare Sicht</b> oft entscheidender als “krasse Werte”. Immer Testshots.
+          Wichtig: In Deutschland entscheidet oft <b>Dunkelheit (Sonnenstand)</b> + Sicht. Testshots > Theorie.
         </div>
-      </div>
-    </section>
-
-    <!-- =========================
-         DECISION + SCORE
-    ========================== -->
-    <section class="card p-8 text-center mb-4">
-      <div class="badge mx-auto mb-4">Geh ich raus?</div>
-
-      <div id="mainStatus" class="text-6xl font-black tracking-tight" style="color:var(--title)">ANALYSE</div>
-      <div class="mt-2 text-sm italic muted px-2" id="mainRec">Daten werden geladen …</div>
-
-      <div class="mt-6">
-        <div class="flex items-center justify-center gap-2 mb-3">
-          <span class="badge">Aurora-Score</span>
-          <span class="text-3xl font-black mono" id="uiScore" style="color:var(--title)">--</span>
-          <span class="text-sm muted">/ 100</span>
-        </div>
-
-        <div class="h-2 w-full bg-black/10 rounded-full overflow-hidden" style="border:1px solid rgba(127,127,127,.18)">
-          <div id="scoreBar" class="h-full" style="width:0%"></div>
-        </div>
-
-        <!-- Only ONE "why" line (no doubles) -->
-        <div class="mt-3 text-[12px] muted" id="uiScoreWhy">—</div>
-      </div>
-
-      <div class="flex flex-wrap justify-center gap-2 mt-7">
-        <span class="badge">Bz: <span id="chipBz" class="mono">--</span> nT</span>
-        <span class="badge">Speed: <span id="chipSpd" class="mono">--</span> km/s</span>
-        <span class="badge">Kp: <span id="chipKp" class="mono">--</span></span>
-        <span class="badge">Wolken: <span id="chipCloud" class="mono">--</span></span>
-        <span class="badge">Mond: <span id="chipMoon" class="mono">--</span></span>
-        <span class="badge" id="uiNight">—</span>
       </div>
     </section>
 
@@ -421,7 +459,7 @@
     </section>
 
     <!-- =========================
-         WETTER & NACHT (Icons + sunrise/sunset)
+         WETTER & NACHT
     ========================== -->
     <section class="card p-4 mb-4">
       <div class="flex items-center justify-between mb-3">
@@ -462,7 +500,7 @@
           </div>
         </div>
         <div class="text-[11px] muted2 mt-2">
-          (Optional) Bürgerlich/nautisch/astronomisch: kann als nächstes ergänzt werden.
+          Score nutzt jetzt Sonnenstand: ab ca. <b>-12°</b> „gut dunkel“, ab <b>-18°</b> „richtig dunkel“.
         </div>
       </div>
     </section>
@@ -473,7 +511,7 @@
     <section id="secCharts" class="card p-4 mb-4">
       <div class="flex items-center justify-between mb-3">
         <div class="text-[10px] uppercase font-black tracking-[.25em] muted">Bz & Speed (letzte ~2h)</div>
-        <span class="badge">robust • gaps ok</span>
+        <span class="badge">robust • zero-gaps</span>
       </div>
       <div class="chart-wrap">
         <canvas id="chartMain"></canvas>
@@ -492,7 +530,7 @@
     </section>
 
     <!-- =========================
-         GFZ + OVATION (MORE)
+         GFZ + OVATION
     ========================== -->
     <section id="secMore" class="card p-4 mb-4">
       <div class="flex items-center justify-between mb-3">
@@ -537,41 +575,49 @@
     </section>
 
     <!-- =========================
-         LINKS / TIPPS (stylisch)
+         LINKS / TIPPS
     ========================== -->
     <section class="card p-4 mb-8">
       <div class="text-[10px] uppercase font-black tracking-[.25em] muted mb-3">Tipps & Tools</div>
 
       <div class="grid grid-cols-1 gap-2 text-sm">
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer"
-           href="https://www.lightpollutionmap.info/">
-          🌑 Dark Spot Finder (Light Pollution Map)
+        <a class="btn btn-ghost" target="_blank" rel="noreferrer" href="https://www.lightpollutionmap.info/">
+          <div>
+            <div class="link-title">🌑 Dark Spot Finder</div>
+            <div class="link-sub muted2">Lichtverschmutzung checken → beste Standorte finden</div>
+          </div>
         </a>
 
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer"
-           href="https://www.windy.com/">
-          ☁️ Wolkencheck (Windy)
+        <a class="btn btn-ghost" target="_blank" rel="noreferrer" href="https://www.windy.com/">
+          <div>
+            <div class="link-title">☁️ Wolkencheck (Windy)</div>
+            <div class="link-sub muted2">Low/High Clouds vergleichen (entscheidet oft alles)</div>
+          </div>
         </a>
 
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer"
-           href="https://services.swpc.noaa.gov/">
-          🛰 NOAA Datenprodukte (SWPC)
+        <a class="btn btn-ghost" target="_blank" rel="noreferrer" href="https://services.swpc.noaa.gov/">
+          <div>
+            <div class="link-title">🛰 NOAA Datenprodukte</div>
+            <div class="link-sub muted2">Solarwind, Magnetfeld, Ovation — Rohdaten & Produkte</div>
+          </div>
         </a>
 
-        <a class="btn btn-ghost text-left" target="_blank" rel="noreferrer"
-           href="https://kp.gfz-potsdam.de/">
-          📈 GFZ Kp & Quicklook
+        <a class="btn btn-ghost" target="_blank" rel="noreferrer" href="https://kp.gfz-potsdam.de/">
+          <div>
+            <div class="link-title">📈 GFZ Kp & Quicklook</div>
+            <div class="link-sub muted2">Europa-nah & häufig schneller als manche US-Views</div>
+          </div>
         </a>
       </div>
 
       <div class="text-center text-[10px] muted2 mt-4 tracking-[.35em] uppercase font-black">
-        Aurora X • NOAA + GFZ + Open-Meteo + OSM • v5
+        Aurora X • NOAA + GFZ + Open-Meteo + OSM • v6
       </div>
     </section>
 
   </div>
 
-  <!-- Bottom Tabs (order fixed) -->
+  <!-- Bottom Tabs -->
   <div class="tabs">
     <div class="tabs-inner">
       <div class="tab active" data-target="secNow">Jetzt</div>
@@ -594,7 +640,6 @@
     ovationNH: "https://services.swpc.noaa.gov/images/aurora-forecast-northern-hemisphere.jpg"
   };
 
-  // Autocomplete: Photon (Komoot) is usually more CORS-friendly than Nominatim
   const GEOCODE = {
     photon: (q) => `https://photon.komoot.io/api/?q=${encodeURIComponent(q)}&limit=6&lang=de`,
     nominatim: (q) => `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&accept-language=de&q=${encodeURIComponent(q)}`
@@ -620,7 +665,13 @@
    ***********************/
   let currentLat = 50.83, currentLon = 12.92;
   let chartMain = null, chartKp = null;
+
   let map, marker, tileLayer;
+
+  // Map overlays
+  let auroraOverlay = null;
+  let terminatorPolyline = null;
+
   let acTimer = null;
 
   const $ = (id) => document.getElementById(id);
@@ -629,6 +680,7 @@
    *  HELPERS
    ***********************/
   function clamp(n,a,b){ return Math.max(a, Math.min(b, n)); }
+
   function safeNum(x){
     const n = Number.parseFloat(x);
     return Number.isFinite(n) ? n : null;
@@ -640,12 +692,9 @@
 
   function extractHHMM(t){
     if(!t) return null;
-    // Handles: "YYYY-MM-DD HH:MM:SS", "YYYY-MM-DDTHH:MM", etc.
     const s = String(t);
+    // iOS/Safari-sicher: NICHT über new Date() gehen, sondern direkt schneiden.
     if(s.includes("T")){
-      const d = new Date(s);
-      if(!isNaN(d)) return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-      // fallback manual
       const p = s.split("T")[1] || "";
       return p.slice(0,5);
     }
@@ -653,7 +702,6 @@
       const p = s.split(" ")[1] || "";
       return p.slice(0,5);
     }
-    // maybe already HH:MM
     if(/^\d{2}:\d{2}/.test(s)) return s.slice(0,5);
     return null;
   }
@@ -672,18 +720,87 @@
     }
   }
 
-  function lastValidRow(table, idx){
+  // Zero-Gaps: treat exact 0 as "gap" optionally
+  function lastValidRow(table, idx, {ignoreZero=false}={}){
     if(!Array.isArray(table) || table.length < 2) return null;
     for(let i = table.length - 1; i >= 1; i--){
       const row = table[i];
       const v = safeNum(row?.[idx]);
-      if(v !== null) return row;
+      if(v === null) continue;
+      if(ignoreZero && v === 0) continue;
+      return row;
     }
     return null;
   }
 
+  function getLastTwoValid(table, idx, {ignoreZero=false}={}){
+    if(!Array.isArray(table) || table.length < 3) return [];
+    const vals = [];
+    for(let i = table.length - 1; i >= 1; i--){
+      const v = safeNum(table[i]?.[idx]);
+      if(v === null) continue;
+      if(ignoreZero && v === 0) continue;
+      vals.push(v);
+      if(vals.length >= 2) break;
+    }
+    return vals; // [last, prev]
+  }
+
   /***********************
-   *  THEME TOGGLE (system/light/dark)
+   *  SOLAR ELEVATION (NOAA-ish simplified)
+   *  -> gives sun altitude in degrees at given lat/lon/time (UTC)
+   ***********************/
+  function toRad(d){ return d * Math.PI / 180; }
+  function toDeg(r){ return r * 180 / Math.PI; }
+
+  function solarElevationDeg(date, lat, lon){
+    // Based on common simplified solar position equations (good enough for twilight buckets)
+    const d = (date.getTime() / 86400000) - 10957.5; // days since J2000 approx (2000-01-01 12:00)
+    const M = toRad((357.5291 + 0.98560028 * d) % 360); // mean anomaly
+    const C = toRad(1.9148) * Math.sin(M) + toRad(0.0200) * Math.sin(2*M) + toRad(0.0003) * Math.sin(3*M);
+    const L = (M + C + toRad(102.9372) + Math.PI) % (2*Math.PI); // ecliptic longitude
+    const e = toRad(23.4397); // obliquity
+
+    const sinDec = Math.sin(e) * Math.sin(L);
+    const dec = Math.asin(sinDec);
+
+    // sidereal time
+    const J2000 = 2451545.0;
+    const JD = date.getTime()/86400000 + 2440587.5;
+    const T = (JD - J2000)/36525;
+    const theta = toRad((280.46061837 + 360.98564736629*(JD - J2000) + 0.000387933*T*T - (T*T*T)/38710000) % 360);
+    const lst = theta + toRad(lon);
+
+    // hour angle
+    const ra = Math.atan2(Math.cos(e)*Math.sin(L), Math.cos(L));
+    const H = (lst - ra);
+
+    const phi = toRad(lat);
+    const alt = Math.asin(Math.sin(phi)*Math.sin(dec) + Math.cos(phi)*Math.cos(dec)*Math.cos(H));
+    return toDeg(alt);
+  }
+
+  function darknessFactorFromSolarElev(elev){
+    // elev in degrees: 0 = horizon, negative = sun below horizon
+    // > -3: too bright -> heavy damping
+    // -3 .. -12: ramp up
+    // <= -12: dark enough
+    if(elev > -3) return 0.10;
+    if(elev > -12){
+      const t = (Math.abs(elev) - 3) / 9; // 0..1
+      return 0.10 + 0.90 * clamp(t,0,1);
+    }
+    return 1.0;
+  }
+
+  function dayNightLabel(elev){
+    if(elev > -3) return "Tag/Dämmerung";
+    if(elev > -12) return "Dämmerung";
+    return "Nacht";
+  }
+
+  /***********************
+   *  THEME TOGGLE
    ***********************/
   function getTheme(){
     return localStorage.getItem("aurora_theme") || "system";
@@ -691,7 +808,6 @@
   function setTheme(t){
     document.documentElement.setAttribute("data-theme", t);
     localStorage.setItem("aurora_theme", t);
-    // map style reacts to theme
     updateMapStyleBadge();
   }
   function cycleTheme(){
@@ -730,7 +846,6 @@
   }
 
   async function acSearch(q){
-    // try Photon first
     const p = await fetchJson(GEOCODE.photon(q), 9000);
     if(p?.features?.length){
       return p.features.map(f => {
@@ -749,7 +864,6 @@
       }).filter(x => Number.isFinite(x.lat) && Number.isFinite(x.lon));
     }
 
-    // fallback to Nominatim
     const n = await fetchJson(GEOCODE.nominatim(q), 9000);
     if(Array.isArray(n) && n.length){
       return n.map(d => ({
@@ -779,7 +893,6 @@
     const t = document.documentElement.getAttribute("data-theme") || "system";
     if(t === "light") return true;
     if(t === "dark") return false;
-    // system:
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches;
   }
 
@@ -789,18 +902,15 @@
 
     if(!map) return;
 
-    // swap tiles
     const url = light
       ? "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
-    if(tileLayer){
-      tileLayer.setUrl(url);
-    }
+    if(tileLayer) tileLayer.setUrl(url);
   }
 
   function setupMap(){
-    map = L.map("map", { zoomControl: true }).setView([currentLat, currentLon], 9);
+    map = L.map("map", { zoomControl: true }).setView([currentLat, currentLon], 8);
 
     const light = isLightThemeEffective();
     const url = light
@@ -823,12 +933,87 @@
     });
 
     updateMapStyleBadge();
+
+    // add overlays
+    setupAuroraOverlay();
+    setupTerminator();
+  }
+
+  function setupAuroraOverlay(){
+    // NOAA ovation image is a global projection; Leaflet can't perfectly georeference it without metadata.
+    // We use a pragmatic overlay across world bounds for "orientation" + interactive pan/zoom.
+    const bounds = [[-85, -180],[85, 180]];
+    const imgUrl = `${NOAA.ovationNH}?ts=${Date.now()}`;
+
+    if(auroraOverlay){
+      auroraOverlay.setUrl(imgUrl);
+      return;
+    }
+
+    auroraOverlay = L.imageOverlay(imgUrl, bounds, { opacity: 0.55, interactive: false });
+    auroraOverlay.addTo(map);
+  }
+
+  function refreshAuroraOverlay(){
+    if(!auroraOverlay) return;
+    auroraOverlay.setUrl(`${NOAA.ovationNH}?ts=${Date.now()}`);
+  }
+
+  function setupTerminator(){
+    // very rough "night line" based on solar declination/hour angle sampling
+    if(terminatorPolyline){
+      terminatorPolyline.remove();
+      terminatorPolyline = null;
+    }
+    terminatorPolyline = L.polyline([], { weight: 2, opacity: 0.8 });
+    terminatorPolyline.addTo(map);
+    updateTerminator();
+  }
+
+  function updateTerminator(){
+    if(!terminatorPolyline) return;
+
+    const date = new Date();
+    const pts = [];
+
+    // sample longitudes for the "0° solar elevation" approx by scanning lat for where elev~0
+    // We'll do a simple visualization: for each lon, find lat where elev crosses 0 (binary search).
+    for(let lon=-180; lon<=180; lon+=10){
+      let lo=-70, hi=70;
+      for(let k=0;k<18;k++){
+        const mid = (lo+hi)/2;
+        const e = solarElevationDeg(date, mid, lon);
+        if(e > 0) lo = mid; else hi = mid;
+      }
+      const lat = (lo+hi)/2;
+      pts.push([lat, lon]);
+    }
+
+    terminatorPolyline.setLatLngs(pts);
+    terminatorPolyline.setStyle({ color: isLightThemeEffective() ? "#111827" : "#e5e7eb" });
   }
 
   /***********************
    *  SCORE + DECISION
    ***********************/
-  function computeAuroraScore({ bz, spd, kp, cloud, moonIllum, isNight }){
+  function latMultiplier(lat){
+    // 48°N -> 0.8, 54°N -> 1.1 (linear, clamped)
+    const m = 0.8 + ( (lat - 48) / 6 ) * (1.1 - 0.8);
+    return clamp(m, 0.8, 1.1);
+  }
+
+  function bzTrendArrow(mag1d){
+    const two = getLastTwoValid(mag1d, 3, {ignoreZero:true});
+    if(two.length < 2) return "";
+    const [last, prev] = two;
+    const d = last - prev;
+    if(Math.abs(d) < 0.2) return "→";
+    // for Bz: more negative is "falling" (good)
+    if(d < 0) return "↘";
+    return "↗";
+  }
+
+  function computeAuroraScore({ bz, spd, kp, cloud, moonIllum, solarElevDeg }){
     let score = 0;
 
     // Kp weight (0..9 => 0..70)
@@ -846,10 +1031,11 @@
       if(spd >= 600) score += 4;
     }
 
-    // Day penalty
-    if(isNight === false) score *= 0.22;
+    // Solar elevation damping (better than is_day)
+    const darkFactor = darknessFactorFromSolarElev(solarElevDeg);
+    score *= darkFactor;
 
-    // Clouds strongly reduce visibility
+    // Clouds reduce visibility
     if(cloud !== null){
       const clearFactor = clamp((100 - cloud) / 100, 0, 1);
       score *= clearFactor;
@@ -861,12 +1047,15 @@
       score -= pen;
     }
 
+    // Latitude multiplier
+    const lm = latMultiplier(currentLat);
+    score *= lm;
+
     score = Math.round(clamp(score, 0, 100));
 
     const why = [];
-    if(isNight === false) why.push("Tag/Dämmerung");
-    else why.push("Nacht");
-
+    why.push(`${dayNightLabel(solarElevDeg)} (${solarElevDeg.toFixed(1)}°)`);
+    why.push(`Lat x${lm.toFixed(2)}`);
     if(kp !== null) why.push(`Kp ${kp.toFixed(1)}`);
     if(bz !== null) why.push(`Bz ${bz.toFixed(1)} nT`);
     if(spd !== null) why.push(`Speed ${Math.round(spd)} km/s`);
@@ -876,22 +1065,24 @@
     return { score, why: why.join(" • ") };
   }
 
-  function decideStatus({ score, bz, spd, cloud, isNight }){
+  function decideStatus({ score, bz, spd, cloud, solarElevDeg }){
     const statusEl = $("mainStatus");
     statusEl.className = "text-6xl font-black tracking-tight";
 
     const strong = (bz !== null && spd !== null && bz <= -10 && spd >= 520);
     const veryClear = (cloud !== null && cloud <= 30);
-    const okNight = (isNight !== false);
 
-    if(okNight && (score >= 70 || (strong && veryClear))){
+    const darkEnough = (solarElevDeg <= -12);
+    const maybeTwilight = (solarElevDeg <= -3);
+
+    if(darkEnough && (score >= 70 || (strong && veryClear))){
       statusEl.textContent = "ALARM";
       statusEl.classList.add("glow-red");
       $("mainRec").textContent = `RAUS! Richtung Norden, Langzeitbelichtung. ${cloud !== null ? (cloud <= 30 ? "Wolken gut." : "Wolken prüfen.") : ""}`;
       return;
     }
 
-    if(okNight && score >= 40){
+    if(maybeTwilight && score >= 40){
       statusEl.textContent = "CHANCE";
       statusEl.classList.add("glow-yellow");
       $("mainRec").textContent = "Beobachten! Kamera bereit halten, Testshots machen (Norden).";
@@ -901,7 +1092,9 @@
     statusEl.textContent = "RUHIG";
     statusEl.style.color = "var(--title)";
     statusEl.style.opacity = "0.55";
-    $("mainRec").textContent = okNight ? "Aktuell eher nichts. Später nochmal checken." : "Der Himmel ist (noch) zu hell. Später nochmal checken.";
+    $("mainRec").textContent = (solarElevDeg > -3)
+      ? "Der Himmel ist (noch) zu hell. Später nochmal checken."
+      : "Aktuell eher nichts. Später nochmal checken.";
   }
 
   function updateScoreUI(score, why){
@@ -1022,8 +1215,11 @@
    ***********************/
   async function updateAll(){
     $("badgeLive").textContent = "lade…";
+    $("badgeLive").classList.remove("glow-green");
 
     moveMap(currentLat, currentLon);
+    updateTerminator();
+    refreshAuroraOverlay();
 
     // Fast summaries
     const [magSum, spdSum] = await Promise.all([
@@ -1047,28 +1243,26 @@
       fetchJson(NOAA.kp1d, 12000)
     ]);
 
-    // Kp
+    // Kp (robust + ignore zero gaps)
     let kp = null;
     if(Array.isArray(kp1d)){
-      const last = lastValidRow(kp1d, 1);
+      const last = lastValidRow(kp1d, 1, {ignoreZero:true});
       kp = last ? safeNum(last[1]) : null;
     }
 
     // fallback bz/spd from tables if summary fails
     if(bz === null && Array.isArray(mag1d)){
-      const last = lastValidRow(mag1d, 3);
+      const last = lastValidRow(mag1d, 3, {ignoreZero:true});
       bz = last ? safeNum(last[3]) : null;
     }
     if(spd === null && Array.isArray(plasma1d)){
-      const last = lastValidRow(plasma1d, 2);
+      const last = lastValidRow(plasma1d, 2, {ignoreZero:true});
       spd = last ? safeNum(last[2]) : null;
     }
 
     // Weather + sunrise/sunset + moon
     const wx = await fetchJson(OPEN_METEO.url(currentLat, currentLon), 12000);
     const cloud = safeNum(wx?.current?.cloud_cover);
-    const isDay = wx?.current?.is_day; // 0/1
-    const isNight = (isDay === 0);
 
     const sunriseISO = wx?.daily?.sunrise?.[0] ?? null;
     const sunsetISO  = wx?.daily?.sunset?.[0] ?? null;
@@ -1078,16 +1272,22 @@
     let moonIllum = null;
     if(Array.isArray(wx?.daily?.moon_illumination)){
       moonIllum = safeNum(wx.daily.moon_illumination[0]);
-      // Some APIs return 0..1, some 0..100 -> normalize to %
       if(moonIllum !== null && moonIllum <= 1.01) moonIllum = moonIllum * 100;
       moonIllum = clamp(moonIllum, 0, 100);
     }
+
+    // Solar elevation (the key fix)
+    const solarElevDeg = solarElevationDeg(new Date(), currentLat, currentLon);
+
+    // Bz trend arrow
+    const bzArrow = Array.isArray(mag1d) ? bzTrendArrow(mag1d) : "";
 
     // UI fill
     $("valBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
     $("valSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
 
     $("chipBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
+    $("chipBzTrend").textContent = bzArrow ? ` ${bzArrow}` : "";
     $("chipSpd").textContent = (spd !== null) ? Math.round(spd) : "--";
     $("chipKp").textContent = (kp !== null) ? kp.toFixed(1) : "--";
     $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
@@ -1096,7 +1296,7 @@
     $("valCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
     $("valMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--";
 
-    // Weather text + icon
+    // Weather text + icon (always set)
     if(cloud === null){
       $("valCloudTxt").textContent = "—";
       $("icoCloud").textContent = "☁️";
@@ -1108,7 +1308,7 @@
       $("icoCloud").textContent = "⛅";
     }else{
       $("valCloudTxt").textContent = "Klar";
-      $("icoCloud").textContent = "🌙";
+      $("icoCloud").textContent = "✨";
     }
 
     if(moonIllum === null){
@@ -1125,12 +1325,13 @@
       $("icoMoon").textContent = "🌙";
     }
 
-    // Sunrise/sunset
+    // Sunrise/sunset (fixed)
     $("sunrise").textContent = sunrise || "--:--";
     $("sunset").textContent  = sunset  || "--:--";
 
-    $("uiNight").textContent = isNight ? "Nacht" : "Tag/Dämmerung";
-    $("tagDayNight").textContent = isNight ? "Nacht" : "Tag";
+    const dn = dayNightLabel(solarElevDeg);
+    $("uiNight").textContent = dn;
+    $("tagDayNight").textContent = dn;
     $("uiUpdated").textContent = fmtTimeLocal();
 
     // live badge
@@ -1139,15 +1340,15 @@
     if(liveOk) $("badgeLive").classList.add("glow-green");
 
     // Score + decision
-    const scorePack = computeAuroraScore({ bz, spd, kp, cloud, moonIllum, isNight });
+    const scorePack = computeAuroraScore({ bz, spd, kp, cloud, moonIllum, solarElevDeg });
     updateScoreUI(scorePack.score, scorePack.why);
-    decideStatus({ score: scorePack.score, bz, spd, cloud, isNight });
+    decideStatus({ score: scorePack.score, bz, spd, cloud, solarElevDeg });
 
     // Charts
     renderTrendChart(mag1d, plasma1d);
     renderKpChart(kp1d);
 
-    // GFZ + Ovation
+    // GFZ + Ovation images
     refreshGFZ();
     refreshOvation();
   }
@@ -1168,8 +1369,12 @@
       const t = extractHHMM(m?.[0]) || extractHHMM(p?.[0]);
       if(!t) continue;
 
-      const bzVal = safeNum(m?.[3]);
-      const spVal = safeNum(p?.[2]);
+      let bzVal = safeNum(m?.[3]);
+      let spVal = safeNum(p?.[2]);
+
+      // Zero-Gaps smoothing: treat 0 as missing
+      if(bzVal === 0) bzVal = null;
+      if(spVal === 0) spVal = null;
 
       labels.push(t);
       bzArr.push(bzVal !== null ? bzVal : null);
@@ -1187,13 +1392,14 @@
       return;
     }
 
-    const rows = kpTable.slice(1).slice(-18); // ~last 24h+
+    const rows = kpTable.slice(1).slice(-18);
     const labels=[], values=[];
     let validCount = 0;
 
     rows.forEach(r => {
       const t = extractHHMM(r?.[0]);
-      const v = safeNum(r?.[1]);
+      let v = safeNum(r?.[1]);
+      if(v === 0) v = null; // zero-gap
       if(!t) return;
       labels.push(t);
       values.push(v !== null ? v : null);
@@ -1245,6 +1451,7 @@
   $("btnTheme").addEventListener("click", () => {
     cycleTheme();
     updateMapStyleBadge();
+    updateTerminator();
   });
 
   $("placeInput").addEventListener("input", (e) => {
@@ -1265,6 +1472,19 @@
     const ac = $("placeInput");
     const list = $("acList");
     if(e.target !== ac && !list.contains(e.target)) hideAc();
+  });
+
+  // Map toggles
+  $("tglAuroraOverlay").addEventListener("change", (e) => {
+    if(!auroraOverlay) return;
+    if(e.target.checked) auroraOverlay.addTo(map);
+    else auroraOverlay.remove();
+  });
+
+  $("tglTerminator").addEventListener("change", (e) => {
+    if(!terminatorPolyline) return;
+    if(e.target.checked) terminatorPolyline.addTo(map);
+    else terminatorPolyline.remove();
   });
 
   // Bottom tabs scroll
@@ -1290,10 +1510,12 @@
     updateAll();
     setInterval(updateAll, 60000);
 
-    // React if system theme changes while on "system"
     if(window.matchMedia){
       window.matchMedia("(prefers-color-scheme: light)").addEventListener("change", () => {
-        if(getTheme() === "system") updateMapStyleBadge();
+        if(getTheme() === "system") {
+          updateMapStyleBadge();
+          updateTerminator();
+        }
       });
     }
   }
