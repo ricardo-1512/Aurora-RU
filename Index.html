@@ -1,864 +1,648 @@
-<!doctype html>
-<html lang="de">
+<!DOCTYPE html>
+<html lang="de" data-theme="system">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Aurora X – Standort-Update</title>
-  <meta name="color-scheme" content="dark light" />
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AURORA X — v8.0 Extreme Mobile</title>
+
+  <!-- UI -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <style>
     :root{
-      --bg:#0f1115; --panel:#171a21; --panel2:#1e2330; --text:#e9eef7; --muted:#a8b3c7;
-      --ok:#40c057; --warn:#ffd43b; --bad:#ff4d4f; --info:#4dabf7; --line:#2a3142;
-      --chip:#22283a; --shadow: 0 10px 30px rgba(0,0,0,.35);
-      --radius:14px;
+      --bg:#070707;
+      --card: rgba(255,255,255,.04);
+      --border: rgba(255,255,255,.10);
+      --muted: rgba(255,255,255,.55);
+      --text: rgba(255,255,255,.92);
+      --title: rgba(255,255,255,.92);
+      --shadow: 0 20px 60px rgba(0,0,0,.55);
+      --chip: rgba(0,0,0,.30);
     }
-    *{box-sizing:border-box}
-    body{
-      margin:0; background:radial-gradient(1200px 700px at 15% -10%, #1b2a4a 0%, rgba(27,42,74,0) 60%),
-                    radial-gradient(1200px 700px at 85% 0%, #2a1b4a 0%, rgba(42,27,74,0) 55%),
-                    var(--bg);
-      color:var(--text); font: 15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;
-      padding:18px;
+    html,body{ background:var(--bg); color:var(--text); font-family: ui-sans-serif, system-ui; }
+    .card{ background: var(--card); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
+    .badge{
+      border: 1px solid rgba(127,127,127,.18);
+      background: var(--chip);
+      border-radius: 999px;
+      padding: .25rem .6rem;
+      font-size: 10px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display:inline-flex;
+      gap:.4rem;
+      align-items:center;
+      white-space:nowrap;
     }
-    a{color:#8fd3ff; text-decoration:none}
-    a:hover{ text-decoration:underline }
+    .btn{
+      border-radius: 14px;
+      padding: 12px 14px;
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      border: 1px solid rgba(127,127,127,.18);
+      user-select:none;
+    }
+    .btn-primary{ background:#22c55e; color:#052e16; }
+    .btn:active{ transform: translateY(1px); }
 
-    .container{ max-width:1100px; margin:0 auto; display:flex; flex-direction:column; gap:14px; }
-    .topbar{
-      display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;
-      padding:14px 16px; border:1px solid var(--line); background:rgba(23,26,33,.7); border-radius:var(--radius);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(8px);
-    }
-    .brand{
-      display:flex; flex-direction:column; gap:4px;
-    }
-    .brand h1{
-      margin:0; font-size:18px; letter-spacing:.2px;
-    }
-    .brand .sub{
-      color:var(--muted); font-size:13px;
-    }
+    #map{ height: 260px; border-radius: 16px; overflow:hidden; border:1px solid rgba(127,127,127,.15); }
+    .img-frame{ border-radius: 16px; overflow:hidden; border:1px solid rgba(127,127,127,.15); background: rgba(0,0,0,.15); }
+    .img-frame img{ width:100%; display:block; }
 
-    .controls{
-      display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;
-    }
-    label{ font-size:12px; color:var(--muted); display:block; margin:0 0 6px 2px;}
-    .field{ display:flex; flex-direction:column; }
-    input, button{
-      border-radius:12px; border:1px solid var(--line);
-      background:rgba(30,35,48,.65); color:var(--text);
-      padding:10px 12px; outline:none;
-    }
-    input{ width:170px; }
-    input.small{ width:120px; }
-    button{
-      cursor:pointer; background:linear-gradient(180deg, rgba(77,171,247,.25), rgba(77,171,247,.08));
-      border-color:rgba(77,171,247,.35);
-      font-weight:600;
-    }
-    button:hover{ filter:brightness(1.1) }
-    .chip{
-      display:inline-flex; align-items:center; gap:8px;
-      padding:8px 10px; border-radius:999px; background:rgba(34,40,58,.75); border:1px solid var(--line);
-      color:var(--muted); font-size:12px;
-    }
-    .dot{ width:10px; height:10px; border-radius:50%; background:#666; display:inline-block }
-    .dot.ok{ background:var(--ok) } .dot.warn{ background:var(--warn) } .dot.bad{ background:var(--bad) } .dot.info{ background:var(--info) }
+    /* Splash */
+    #splash{ position:fixed; inset:0; z-index:999999; display:flex; justify-content:center; align-items:center; background:black; }
 
-    .grid{
-      display:grid;
-      grid-template-columns: 1.25fr .75fr;
-      gap:14px;
+    /* Tabs */
+    .tabs{
+      position:fixed; left:0; right:0; bottom:0;
+      padding:10px 12px env(safe-area-inset-bottom);
+      background:rgba(10,10,10,.85);
+      border-top:1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(18px);
+      z-index:99999;
     }
-    @media (max-width: 980px){
-      .grid{ grid-template-columns: 1fr; }
-      input{ width:160px; }
+    .tabs-inner{ max-width:720px; margin:0 auto; display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+    .tab{
+      padding:16px 10px;
+      border-radius:16px;
+      text-align:center;
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:.16em;
+      text-transform:uppercase;
+      color:var(--muted);
+      background:rgba(127,127,127,.10);
+      border:1px solid rgba(255,255,255,.06);
     }
+    .tab.active{ background:rgba(34,197,94,.20); border:1px solid rgba(34,197,94,.40); color:var(--title); }
+    .pb-tabs{ padding-bottom:110px; }
 
-    .card{
-      border:1px solid var(--line); background:rgba(23,26,33,.72);
-      border-radius:var(--radius); box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .card header{
-      padding:14px 16px; border-bottom:1px solid var(--line);
-      display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
-      background:rgba(30,35,48,.45);
-    }
-    .card header h2{
-      margin:0; font-size:14px; letter-spacing:.2px;
-    }
-    .card .body{ padding:14px 16px; }
-
-    .hero{
-      display:flex; flex-direction:column; gap:12px;
-    }
-    .decision{
-      display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
-      padding:14px; border-radius:16px; border:1px solid var(--line);
-      background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,.01));
-    }
-    .decision .left{ display:flex; flex-direction:column; gap:6px; }
-    .decision .title{ font-size:12px; color:var(--muted); }
-    .decision .big{
-      font-size:28px; font-weight:850; letter-spacing:.4px;
-    }
-    .decision .right{
-      display:flex; flex-direction:column; align-items:flex-end; gap:6px;
-      min-width:220px;
-    }
-    .pill{
-      display:inline-flex; align-items:center; gap:10px;
-      padding:10px 12px; border-radius:999px; font-weight:800; letter-spacing:.25px;
-      border:1px solid var(--line);
-    }
-    .pill.ok{ background: rgba(64,192,87,.18); border-color: rgba(64,192,87,.35); color:#c9f7d1;}
-    .pill.warn{ background: rgba(255,212,59,.14); border-color: rgba(255,212,59,.30); color:#fff4c2;}
-    .pill.bad{ background: rgba(255,77,79,.12); border-color: rgba(255,77,79,.30); color:#ffd2d3;}
-    .pill.info{ background: rgba(77,171,247,.14); border-color: rgba(77,171,247,.30); color:#d6ecff;}
-
-    .kpis{
-      display:grid; grid-template-columns: repeat(4, 1fr); gap:10px;
-    }
-    @media (max-width: 760px){ .kpis{ grid-template-columns: repeat(2, 1fr); } }
-    .kpi{
-      padding:12px; border-radius:14px; border:1px solid var(--line);
-      background: rgba(30,35,48,.35);
-      display:flex; flex-direction:column; gap:4px;
-      min-height:78px;
-    }
-    .kpi .label{ font-size:12px; color:var(--muted) }
-    .kpi .value{ font-size:18px; font-weight:800 }
-    .kpi .hint{ font-size:12px; color:var(--muted) }
-
-    .explain{
-      color:var(--muted); font-size:13px; margin-top:4px;
-    }
-    .mini{
-      display:flex; gap:10px; flex-wrap:wrap; margin-top:6px;
-    }
-    .mini .chip strong{ color:var(--text); font-weight:700 }
-
-    .maps{
-      display:grid; grid-template-columns: repeat(3, 1fr); gap:10px;
-    }
-    @media (max-width: 980px){ .maps{ grid-template-columns: 1fr; } }
-    figure{ margin:0; border:1px solid var(--line); border-radius:14px; overflow:hidden; background:rgba(15,17,21,.55); }
-    figcaption{ padding:10px 12px; font-size:12px; color:var(--muted); border-bottom:1px solid var(--line); background:rgba(30,35,48,.35);}
-    img{ width:100%; display:block; }
-
-    .sources{ list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px; }
-    .sources li{
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
-      padding:10px 12px; border-radius:14px; border:1px solid var(--line);
-      background: rgba(30,35,48,.28);
-    }
-    .sources .left{
-      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
-      min-width: 0;
-    }
-    .sources .left a{ font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:420px; }
-    .tag{ font-size:12px; color:var(--muted); background:rgba(34,40,58,.8); border:1px solid var(--line); padding:3px 8px; border-radius:999px; }
-    .rightnote{ color:var(--muted); font-size:12px; white-space:nowrap; }
-
-    .footer{
-      color:var(--muted); font-size:12px; text-align:center; padding:10px 0;
-    }
-    .muted{ color:var(--muted) }
-    .mono{ font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-    .sep{ height:1px; background:var(--line); margin:12px 0; }
-
-    /* Wetter widgets */
-    .iframeWrap{
-      border:1px solid var(--line); border-radius:14px; overflow:hidden; background:rgba(15,17,21,.4);
-    }
-    iframe{ width:100%; border:0; display:block; }
+    /* Status colors */
+    .status-alarm{ color:#ef4444; text-shadow: 0 0 24px rgba(239,68,68,.25); }
+    .status-chance{ color:#f59e0b; text-shadow: 0 0 24px rgba(245,158,11,.18); }
+    .status-quiet{ color:rgba(255,255,255,.45); }
   </style>
 </head>
 
-<body>
-<div class="container">
+<body class="p-4 pb-tabs">
 
-  <!-- TOPBAR -->
-  <div class="topbar">
-    <div class="brand">
-      <h1>🌌 Aurora X – Standort-Update</h1>
-      <div class="sub">
-        Profi-Check in 5 Sekunden: <span class="mono">Sehen?</span> + <span class="mono">Wolken?</span> + <span class="mono">Aurora-Lage?</span>
+  <!-- SPLASH -->
+  <div id="splash">
+    <div class="text-center">
+      <div class="text-3xl font-black text-white tracking-tight">
+        AURORA <span class="text-green-400">X</span>
       </div>
-      <div class="mini">
-        <span class="chip"><span class="dot info"></span> Auto-Update: <strong id="autoEvery">60s</strong></span>
-        <span class="chip"><span class="dot" id="dotNow"></span> Status: <strong id="statusText">lädt…</strong></span>
-        <span class="chip">Letztes Update: <strong id="lastUpdate">—</strong></span>
+      <div class="mt-3 text-sm text-white/60">GPS & Sensoren werden geladen…</div>
+      <div class="mt-6 w-44 h-1 bg-white/10 rounded-full overflow-hidden">
+        <div id="splashBar" class="h-full bg-green-400 w-0"></div>
       </div>
-    </div>
-
-    <div class="controls">
-      <div class="field">
-        <label for="locName">Ort / Standort</label>
-        <input id="locName" type="text" placeholder="z.B. Chemnitz – Feldrand" />
-      </div>
-      <div class="field">
-        <label for="lat">Lat</label>
-        <input id="lat" class="small" type="number" step="0.0001" />
-      </div>
-      <div class="field">
-        <label for="lon">Lon</label>
-        <input id="lon" class="small" type="number" step="0.0001" />
-      </div>
-      <button id="btnUpdate">Aktualisieren</button>
-      <button id="btnSave">Speichern</button>
+      <div class="mt-3 text-[11px] text-white/40" id="splashMsg">Start…</div>
     </div>
   </div>
 
-  <div class="grid">
+  <div class="max-w-2xl mx-auto">
 
-    <!-- LEFT: DECISION + MAPS -->
-    <div class="card">
-      <header>
-        <h2>✅ Entscheidung & Bedingungen</h2>
-        <span class="chip"><span class="dot info"></span> Jetzt zählt: <strong>Sichtbarkeit in DE</strong> (Tag/Dämmerung wird berücksichtigt)</span>
-      </header>
-      <div class="body hero">
+    <!-- NOW -->
+    <section id="secNow" class="card p-5 mb-4">
+      <div class="flex justify-between items-start gap-3">
+        <div>
+          <h1 class="text-xl font-black tracking-tight">
+            AURORA <span class="text-green-400">X</span>
+          </h1>
 
-        <div class="decision">
-          <div class="left">
-            <div class="title">Ort / Standort</div>
-            <div class="big" id="locTitle">—</div>
-            <div class="explain" id="decisionExplain">—</div>
-          </div>
-          <div class="right">
-            <div class="pill info" id="goPill"><span class="dot info"></span><span id="goText">lade…</span></div>
-            <div class="muted">Score: <strong id="scoreNow">—</strong>/100 (JETZT)</div>
-            <div class="muted">Score: <strong id="scoreNight">—</strong>/100 (NÄCHSTE NACHT)</div>
+          <div class="flex gap-2 mt-2 flex-wrap">
+            <span class="badge" id="badgeLive">offline</span>
+            <span class="badge" id="cityName">📍 Standort…</span>
           </div>
         </div>
 
-        <div class="kpis">
-          <div class="kpi">
-            <div class="label">Licht / Himmel</div>
-            <div class="value" id="kpiDark">—</div>
-            <div class="hint" id="kpiDarkHint">—</div>
-          </div>
-          <div class="kpi">
-            <div class="label">Wolken (Spot)</div>
-            <div class="value" id="kpiCloud">—</div>
-            <div class="hint" id="kpiCloudHint">—</div>
-          </div>
-          <div class="kpi">
-            <div class="label">Aurora-Lage (NOAA)</div>
-            <div class="value" id="kpiAurora">—</div>
-            <div class="hint" id="kpiAuroraHint">—</div>
-          </div>
-          <div class="kpi">
-            <div class="label">Kp (planetar)</div>
-            <div class="value" id="kpiKp">—</div>
-            <div class="hint" id="kpiKpHint">—</div>
-          </div>
-        </div>
-
-        <div class="sep"></div>
-
-        <div class="maps">
-          <figure>
-            <figcaption>Deutschland – aktuell (MTWetter)</figcaption>
-            <img class="autoRefresh"
-                 data-src="https://aurora.mtwetter.de/realtime/aurora_probability_map_nightMode.png"
-                 alt="Aurora Probability Map - aktuell" />
-          </figure>
-          <figure>
-            <figcaption>Deutschland – 1h Maximum (MTWetter)</figcaption>
-            <img class="autoRefresh"
-                 data-src="https://aurora.mtwetter.de/realtime/aurora_probability_map_1h_nightMode.png"
-                 alt="Aurora Probability Map - 1h" />
-          </figure>
-          <figure>
-            <figcaption>Deutschland – 6h Maximum (MTWetter)</figcaption>
-            <img class="autoRefresh"
-                 data-src="https://aurora.mtwetter.de/realtime/aurora_probability_map_6h_nightMode.png"
-                 alt="Aurora Probability Map - 6h" />
-          </figure>
-        </div>
-
-        <p class="explain">
-          Tipp: Für dich als Fotograf zählt vor allem: <strong>dunkel genug</strong> + <strong>wenig Wolken</strong> + <strong>genug Aktivität</strong>.
-          Tagsüber wird der „JETZT-Score“ automatisch abgewertet, selbst wenn die Aurora-Lage hoch ist.
-        </p>
+        <button id="btnUpdate" class="btn btn-primary">Update</button>
       </div>
-    </div>
 
-    <!-- RIGHT: WEATHER + SOURCES -->
-    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div class="mt-6 text-center">
+        <div class="badge mx-auto mb-3">Geh ich raus?</div>
+        <div id="mainStatus" class="text-6xl font-black">—</div>
+        <div id="mainRec" class="mt-2 text-sm text-white/60 italic">Analyse läuft…</div>
 
-      <div class="card">
-        <header>
-          <h2>☁️ Wetter (Widget) & 🌅 Tageslicht</h2>
-          <span class="chip"><span class="dot info"></span> Quelle: wetter.de Widgets</span>
-        </header>
-        <div class="body">
-          <div class="iframeWrap" style="margin-bottom:10px;">
-            <!-- 3-Tage Widget (dein Code) -->
-            <iframe style="height:215px; background-color: transparent;"
-                    id="wetterWidget"
-                    src="https://www.wetter.de/widget/3tage/u311njez/false/"></iframe>
-          </div>
+        <div class="mt-6 flex justify-center gap-2 flex-wrap">
+          <span class="badge">Kp: <span id="chipKp">--</span></span>
+          <span class="badge">Bz: <span id="chipBz">--</span></span>
+          <span class="badge">Wolken: <span id="chipCloud">--</span></span>
+          <span class="badge">Nacht: <span id="uiNight">--</span></span>
+        </div>
 
-          <div class="iframeWrap">
-            <!-- Daylight Widget (dein Code) -->
-            <iframe style="height:290px; background-color: transparent;"
-                    id="daylightWidget"
-                    src="https://www.wetter.de/widget/daylight/u311njez"></iframe>
-          </div>
+        <div class="mt-4 text-[11px] text-white/45" id="miniWhy">—</div>
+      </div>
+    </section>
 
-          <p class="explain">
-            Der Linktext wird absichtlich statisch gesetzt (damit kein <span class="mono">[object Promise]</span> erscheint):
-            <a href="https://www.wetter.de" rel="nofollow noopener" target="_blank">Wetter & Sonnenzeiten (wetter.de)</a>
-          </p>
+    <!-- MAP -->
+    <section id="secMap" class="card p-4 mb-4">
+      <div class="flex justify-between mb-2">
+        <div class="badge">Interaktive Karte</div>
+        <span class="badge">Drag & Zoom</span>
+      </div>
+      <div id="map"></div>
+      <div class="mt-3 text-[11px] text-white/45">
+        Tipp: Pin auf dunklen Spot ziehen → Wolken prüfen → Testshots (Norden).
+      </div>
+    </section>
+
+    <!-- WEATHER -->
+    <section id="secWeather" class="card p-4 mb-4">
+      <div class="badge mb-3">Wetter & Sonne</div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <div class="card p-3">
+          <div class="text-sm text-white/60">Bewölkung</div>
+          <div class="text-2xl font-black" id="valCloud">--%</div>
+          <div class="text-[11px] text-white/45" id="valCloudTxt">—</div>
+        </div>
+
+        <div class="card p-3">
+          <div class="text-sm text-white/60">Mond</div>
+          <div class="text-2xl font-black" id="valMoon">--%</div>
+          <div class="text-[11px] text-white/45" id="valMoonTxt">—</div>
         </div>
       </div>
 
-      <div class="card">
-        <header>
-          <h2>🧩 Datenquellen Monitor</h2>
-          <span class="chip"><span class="dot info"></span> schnell sehen, ob alles lädt</span>
-        </header>
-        <div class="body">
-          <ul class="sources">
-            <li>
-              <div class="left">
-                <span class="dot" id="s-mtwetter"></span>
-                <a href="https://aurora.mtwetter.de/" target="_blank" rel="noopener">aurora.mtwetter.de</a>
-                <span class="tag">DE Karten</span>
-              </div>
-              <div class="rightnote" id="note-mtwetter">—</div>
-            </li>
-            <li>
-              <div class="left">
-                <span class="dot" id="s-noaa"></span>
-                <a href="https://www.swpc.noaa.gov/products/aurora-30-minute-forecast" target="_blank" rel="noopener">NOAA / SWPC</a>
-                <span class="tag">KP + Ovation</span>
-              </div>
-              <div class="rightnote" id="note-noaa">—</div>
-            </li>
-            <li>
-              <div class="left">
-                <span class="dot" id="s-openmeteo"></span>
-                <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo</a>
-                <span class="tag">Wolken (API)</span>
-              </div>
-              <div class="rightnote" id="note-openmeteo">—</div>
-            </li>
-          </ul>
-
-          <div class="sep"></div>
-          <p class="explain">
-            <strong>Wie ich den Score baue:</strong><br/>
-            • „JETZT“ = Aurora-Aktivität × (1 − Wolken) × <strong>Sichtbarkeit (Dunkelheit)</strong><br/>
-            • „NÄCHSTE NACHT“ = gleiche Logik, aber mit Dunkelheits-Faktor für die nächste echte Dunkelphase.<br/>
-            So bekommst du keine „falschen Alarm-Momente“ um 13:16 Uhr.
-          </p>
+      <div class="grid grid-cols-2 gap-3 mt-3 text-sm">
+        <div>
+          <div class="text-white/50">Sonnenaufgang</div>
+          <div id="sunrise" class="font-black">--:--</div>
+        </div>
+        <div>
+          <div class="text-white/50">Sonnenuntergang</div>
+          <div id="sunset" class="font-black">--:--</div>
         </div>
       </div>
 
-    </div>
+      <div class="mt-3 text-[11px] text-white/45" id="nightNote">
+        Für Polarlichter zählt echte Dunkelheit (Nacht/ Dämmerung) + klare Sicht.
+      </div>
+    </section>
+
+    <!-- CHART -->
+    <section id="secCharts" class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <div class="badge">Bz Trend (letzte ~2h)</div>
+        <span class="badge" id="chartTag">live</span>
+      </div>
+      <canvas id="chartMain" height="180"></canvas>
+      <div class="mt-2 text-[11px] text-white/45">
+        Faustregel: <span class="text-white/70">negativer</span> Bz hilft. Wenn Bz Richtung 0 dreht, schließt sich das Fenster oft wieder.
+      </div>
+    </section>
+
+    <!-- MORE -->
+    <section id="secMore" class="card p-4 mb-8">
+      <div class="badge mb-3">Live Monitoring</div>
+
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[11px] text-white/55">MTWetter — Deutschlandkarte</div>
+          <span class="badge" id="mtTime">—</span>
+        </div>
+        <div class="img-frame">
+          <img id="mtMap" alt="MTWetter Deutschland" />
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[11px] text-white/55">GFZ — Kp Nowcast Quicklook</div>
+          <span class="badge" id="gfzTime">—</span>
+        </div>
+        <div class="img-frame">
+          <img id="gfzMag" alt="GFZ Kp Quicklook" />
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-[11px] text-white/55">NOAA — Ovation Oval (NH)</div>
+          <span class="badge" id="ovaTime">—</span>
+        </div>
+        <div class="img-frame">
+          <img id="ovationGlobal" alt="NOAA Ovation" />
+        </div>
+      </div>
+    </section>
+
   </div>
 
-  <div class="footer">
-    Aurora X – kompakt & praxisnah. Quellen: NOAA/SWPC (KP/Ovation/Solarwind), MTWetter Karten, Open-Meteo (Wolken), wetter.de Widgets.
+  <!-- Bottom Tabs -->
+  <div class="tabs">
+    <div class="tabs-inner">
+      <div class="tab active" data-target="secNow">Jetzt</div>
+      <div class="tab" data-target="secMap">Karte</div>
+      <div class="tab" data-target="secCharts">Charts</div>
+      <div class="tab" data-target="secMore">Mehr</div>
+    </div>
   </div>
-</div>
 
 <script>
-/**
- * AURORA X – FINAL (Single-File)
- * ----------------------------------------------------
- * Ziele:
- * 1) Sofort klare Entscheidung ("RAUSGEHEN?") – auch für Laien.
- * 2) Profi-Infos: Kp, Solarwind-Indikatoren, Aurora-Aktivität, Wolken.
- * 3) Tagsüber keine "Fake-Riesen-Wahrscheinlichkeit": Sichtbarkeit wird über Sonnenstand gedämpft.
- *
- * Datenquellen (öffentlich):
- * - NOAA/SWPC: Kp, Ovation Aurora, Solarwind:
- *   https://services.swpc.noaa.gov/
- * - Open-Meteo: Wolken:
- *   https://api.open-meteo.com/
- * - MTWetter: Deutschlandkarten (PNG):
- *   https://aurora.mtwetter.de/
- */
-
-const AUTO_REFRESH_MS = 60_000;
-
-// Default Standort (Chemnitz)
-const DEFAULTS = {
-  name: "Chemnitz – Standort",
-  lat: 50.8278,
-  lon: 12.9214,
-};
-
-// ---------- UI helpers ----------
+/***********************
+ * AURORA X v8.0 — Extreme Mobile
+ ***********************/
 const $ = (id) => document.getElementById(id);
 
-function setDot(el, state){
-  // state: ok|warn|bad|info
-  el.className = "dot " + (state || "");
+/* Splash */
+function splashProgress(p, msg){
+  $("splashBar").style.width = `${p}%`;
+  if(msg) $("splashMsg").textContent = msg;
 }
+function hideSplash(){ $("splash").style.display = "none"; }
 
-function fmt(n, digits=1){
-  if (n === null || n === undefined || Number.isNaN(n)) return "—";
-  return Number(n).toFixed(digits);
-}
+/* Utils */
+function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
+function fmtTimeLocal(d=new Date()){ return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
 
-function clamp(x, a, b){ return Math.max(a, Math.min(b, x)); }
+function isErr(x){ return !!(x && typeof x === "object" && x.__error); }
 
-// ---------- Local storage ----------
-const KEY = "auroraX_location_v1";
-
-function loadLocation(){
-  try{
-    const raw = localStorage.getItem(KEY);
-    if(!raw) return DEFAULTS;
-    const v = JSON.parse(raw);
-    if(!v || typeof v !== "object") return DEFAULTS;
-    return {
-      name: String(v.name || DEFAULTS.name),
-      lat: Number(v.lat ?? DEFAULTS.lat),
-      lon: Number(v.lon ?? DEFAULTS.lon),
-    };
-  }catch{ return DEFAULTS; }
-}
-
-function saveLocation(loc){
-  localStorage.setItem(KEY, JSON.stringify(loc));
-}
-
-// ---------- Sun position (no external libs) ----------
-// Minimal NOAA-style solar position approximation for altitude.
-// Good enough to classify: day / civil / nautical / astronomical / night.
-function toJulian(date){ return date / 86400000 - 0.5 + 2440588; }
-function toDays(date){ return toJulian(date) - 2451545; }
-function rad(deg){ return deg * Math.PI / 180; }
-function deg(rad){ return rad * 180 / Math.PI; }
-
-function solarMeanAnomaly(d){ return rad(357.5291 + 0.98560028 * d); }
-function eclipticLongitude(M){
-  const C = rad(1.9148) * Math.sin(M) + rad(0.02) * Math.sin(2*M) + rad(0.0003) * Math.sin(3*M);
-  const P = rad(102.9372);
-  return M + C + P + Math.PI;
-}
-function declination(L){
-  const e = rad(23.4397);
-  return Math.asin(Math.sin(e) * Math.sin(L));
-}
-function rightAscension(L){
-  const e = rad(23.4397);
-  return Math.atan2(Math.cos(e) * Math.sin(L), Math.cos(L));
-}
-function siderealTime(d, lw){
-  return rad(280.16 + 360.9856235 * d) - lw;
-}
-
-function sunAltitude(date, lat, lon){
-  const lw = rad(-lon);
-  const phi = rad(lat);
-  const d = toDays(date);
-  const M = solarMeanAnomaly(d);
-  const L = eclipticLongitude(M);
-  const dec = declination(L);
-  const ra = rightAscension(L);
-  const st = siderealTime(d, lw);
-  const H = st - ra;
-
-  const alt = Math.asin(Math.sin(phi)*Math.sin(dec) + Math.cos(phi)*Math.cos(dec)*Math.cos(H));
-  return deg(alt);
-}
-
-function darknessClass(altDeg){
-  // thresholds by solar altitude:
-  // > 0: day
-  // 0..-6: civil twilight
-  // -6..-12: nautical twilight
-  // -12..-18: astronomical twilight
-  // < -18: night
-  if (altDeg > 0) return {name:"Tag", key:"day", factor:0.0, hint:"Zu hell – visuell praktisch unmöglich."};
-  if (altDeg > -6) return {name:"Bürgerl. Dämmerung", key:"civil", factor:0.15, hint:"Sehr hell – nur extremes Event fotografisch evtl."};
-  if (altDeg > -12) return {name:"Naut. Dämmerung", key:"nautical", factor:0.45, hint:"Besser – erste Foto-Chancen bei guter Aktivität."};
-  if (altDeg > -18) return {name:"Astr. Dämmerung", key:"astro", factor:0.75, hint:"Sehr gut – Himmel dunkel genug."};
-  return {name:"Nacht", key:"night", factor:1.0, hint:"Optimal – maximale Sichtbarkeit."};
-}
-
-function nextNightFactorWindow(lat, lon){
-  // Nächste 24h stündlich scannen, besten Dunkelheitsfaktor nehmen
-  const now = new Date();
-  let best = 0;
-  let bestAt = null;
-  for(let h=0; h<=24; h++){
-    const t = new Date(now.getTime() + h*3600*1000);
-    const alt = sunAltitude(t, lat, lon);
-    const dc = darknessClass(alt);
-    if(dc.factor > best){
-      best = dc.factor;
-      bestAt = t;
-    }
-  }
-  return {bestFactor: best, bestTime: bestAt};
-}
-
-// ---------- NOAA / SWPC fetch ----------
-async function fetchJSON(url, timeoutMs=8000){
+async function fetchJson(url, timeoutMs=12000){
   const ctrl = new AbortController();
-  const t = setTimeout(()=>ctrl.abort(), timeoutMs);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
   try{
-    const res = await fetch(url, {signal: ctrl.signal, cache:"no-store"});
-    if(!res.ok) throw new Error("HTTP " + res.status);
+    const res = await fetch(url, { cache:"no-store", signal: ctrl.signal });
+    if(!res.ok) return { __error:true, status:res.status, statusText:res.statusText };
     return await res.json();
-  } finally {
+  }catch(e){
+    return { __error:true, message:String(e.message || e) };
+  }finally{
     clearTimeout(t);
   }
 }
-
-async function getKpLatest(){
-  // returns latest Kp from NOAA planetary K-index product (table JSON)
-  // format: [ [time_tag, kp, ...], ... ]
-  const url = "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json";
-  const data = await fetchJSON(url);
-  // skip header row
-  const rows = data.slice(1).filter(r => r && r.length >= 2);
-  const last = rows[rows.length - 1];
-  return { kp: Number(last[1]), time: new Date(last[0] + "Z") };
+function extractHHMM(iso){
+  if(!iso) return null;
+  const d = new Date(iso);
+  if(isNaN(d)) return null;
+  return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+}
+function lastValidRow(table, idx){
+  if(!Array.isArray(table)) return null;
+  for(let i=table.length-1; i>=1; i--){
+    const v = Number(table[i]?.[idx]);
+    if(Number.isFinite(v)) return table[i];
+  }
+  return null;
 }
 
-async function getSolarWindLatest(){
-  // Bz from mag-1-day, speed from plasma-1-day
-  const magUrl = "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json";
-  const plaUrl = "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json";
-  const [mag, pla] = await Promise.all([fetchJSON(magUrl), fetchJSON(plaUrl)]);
-  const magRows = mag.slice(1).filter(r => r && r.length >= 7);
-  const plaRows = pla.slice(1).filter(r => r && r.length >= 4);
+/***********************
+ * Endpoints
+ ***********************/
+const NOAA = {
+  mag1d: "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json",
+  plasma1d: "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json",
+  kp: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
+  ovation: "https://services.swpc.noaa.gov/images/aurora-forecast-northern-hemisphere.jpg"
+};
+const SUN_API = (lat, lon) => `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&formatted=0`;
+const OPEN_METEO = (lat, lon) =>
+  `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}` +
+  `&current=cloud_cover,is_day` +
+  `&daily=moon_illumination` +
+  `&timezone=auto`;
 
-  const m = magRows[magRows.length - 1];
-  const p = plaRows[plaRows.length - 1];
-
-  // mag columns (typical): time_tag, bx, by, bz, bt, lat, lon (varies)
-  const time = new Date(m[0] + "Z");
-  const bz = Number(m[3]);
-  // plasma columns (typical): time_tag, density, speed, temp
-  const speed = Number(p[2]);
-  const density = Number(p[1]);
-
-  return { time, bz, speed, density };
+/* GFZ quicklook (daily png) */
+function gfzQuicklookUrlYYYYMMDD(yyyy_mm_dd){
+  return `https://kp.gfz-potsdam.de/fileadmin/kp-archiv/png/${yyyy_mm_dd}.png`;
 }
 
-async function getOvationValueNear(lat, lon){
-  // Ovation grid values; we pick nearest point by great-circle approx.
-  const url = "https://services.swpc.noaa.gov/json/ovation_aurora_latest.json";
-  const data = await fetchJSON(url);
-  // data is array of objects: { "Latitude":..., "Longitude":..., "Aurora":... } (fields may vary)
-  // Normalize keys:
-  const arr = Array.isArray(data) ? data : (data.coordinates || data.data || []);
-  if(!Array.isArray(arr) || arr.length === 0) return { value: null, time: null };
+/***********************
+ * State
+ ***********************/
+let currentLat = 50.83;
+let currentLon = 12.92;
+let map, marker;
+let chartMain = null;
 
-  let best = null;
-  let bestDist = Infinity;
-  for(const it of arr){
-    const la = Number(it.Latitude ?? it.latitude ?? it.lat);
-    const lo = Number(it.Longitude ?? it.longitude ?? it.lon);
-    const val = Number(it.Aurora ?? it.aurora ?? it.value);
-    if(!Number.isFinite(la) || !Number.isFinite(lo) || !Number.isFinite(val)) continue;
+/***********************
+ * GPS + City
+ ***********************/
+async function initGPS(){
+  return new Promise((resolve) => {
+    if(!navigator.geolocation){ resolve(); return; }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { currentLat = pos.coords.latitude; currentLon = pos.coords.longitude; resolve(); },
+      () => resolve(),
+      { enableHighAccuracy:true, timeout:9000 }
+    );
+  });
+}
 
-    // handle lon wrap
-    let dLon = Math.abs(lo - lon);
-    dLon = Math.min(dLon, 360 - dLon);
-    const dLat = la - lat;
-    const dist = dLat*dLat + dLon*dLon;
-    if(dist < bestDist){
-      bestDist = dist;
-      best = { la, lo, val };
+async function reverseGeocodeCity(){
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLon}`;
+  const data = await fetchJson(url, 9000);
+  if(isErr(data)){ $("cityName").textContent = "📍 Unbekannt"; return; }
+  const city = data.address?.city || data.address?.town || data.address?.village || "Standort";
+  $("cityName").textContent = `📍 ${city}`;
+}
+
+/***********************
+ * Map
+ ***********************/
+function setupMap(){
+  map = L.map("map", {
+    zoomControl: true,
+    dragging: true,
+    tap: true,
+    scrollWheelZoom: false
+  }).setView([currentLat, currentLon], 8);
+
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
+
+  marker = L.marker([currentLat, currentLon], { draggable:true }).addTo(map);
+  marker.on("dragend", () => {
+    const p = marker.getLatLng();
+    currentLat = p.lat;
+    currentLon = p.lng;
+    reverseGeocodeCity();
+    updateAll();
+  });
+}
+
+/***********************
+ * Score + Decision
+ ***********************/
+function computeScore({kp,bz,spd,cloud,moon,isNight}){
+  let score = 0;
+
+  if(kp !== null) score += kp * 12;                 // Kp 5 => 60
+  if(bz !== null && bz < 0) score += Math.abs(bz) * 2.0;  // Bz -10 => +20
+  if(spd !== null && spd > 450) score += (spd - 450) * 0.05; // 650 => +10
+
+  if(cloud !== null) score -= cloud * 0.6;
+  if(moon !== null) score -= (moon/100) * 15;
+  if(!isNight) score -= 50;
+
+  if(cloud !== null && cloud > 90) score *= 0.10;
+  if(cloud !== null && cloud >= 98) score = 0;
+
+  return clamp(Math.round(score), 0, 100);
+}
+
+function setStatus(label, cls, rec){
+  const el = $("mainStatus");
+  el.className = `text-6xl font-black ${cls}`;
+  el.textContent = label;
+  $("mainRec").textContent = rec;
+}
+
+function decideStatus(score, meta){
+  const { isNight, cloud } = meta || {};
+  if(score >= 70 && isNight){
+    setStatus("ALARM", "status-alarm", "Raus! Richtung Norden. Testshots. Dunkler Spot.");
+    return;
+  }
+  if(score >= 40 && isNight){
+    setStatus("CHANCE", "status-chance", "Beobachten. Kamera bereit halten. Norden testen.");
+    return;
+  }
+  if(!isNight){
+    setStatus("RUHIG", "status-quiet", "Zu hell (Tag/Dämmerung). Später nochmal checken.");
+    return;
+  }
+  if(cloud !== null && cloud > 85){
+    setStatus("RUHIG", "status-quiet", "Zu wolkig. Spot wechseln oder Lücke abwarten.");
+    return;
+  }
+  setStatus("RUHIG", "status-quiet", "Aktuell eher nichts. Später nochmal checken.");
+}
+
+/***********************
+ * Chart (Bz)
+ ***********************/
+function renderChart(labels, bzVals){
+  const ctx = $("chartMain").getContext("2d");
+  if(chartMain) chartMain.destroy();
+
+  chartMain = new Chart(ctx, {
+    type:"line",
+    data:{
+      labels,
+      datasets:[{
+        label:"Bz (nT)",
+        data:bzVals,
+        borderWidth:2,
+        pointRadius:0,
+        tension:0.35
+      }]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      animation:false,
+      plugins:{ legend:{display:false} },
+      scales:{
+        x:{ ticks:{ maxTicksLimit:6, color:"rgba(255,255,255,.55)" }, grid:{ color:"rgba(255,255,255,.08)" } },
+        y:{ ticks:{ color:"rgba(255,255,255,.55)" }, grid:{ color:"rgba(255,255,255,.08)" } }
+      }
+    }
+  });
+}
+
+/***********************
+ * Live Maps
+ ***********************/
+function safeImg(id){
+  const el = $(id);
+  if(!el) return;
+  el.onerror = () => {
+    el.style.opacity = "0.35";
+    el.title = "Bild aktuell nicht erreichbar";
+  };
+}
+
+function refreshMTWetter(){
+  const ts = Date.now();
+  $("mtMap").src = `https://aurora.mtwetter.de/forecast/aurora_map.png?ts=${ts}`;
+  $("mtTime").textContent = fmtTimeLocal();
+}
+
+function refreshGFZQuicklook(){
+  const d = new Date();
+  const yyyy_mm_dd = d.toISOString().slice(0,10);
+  $("gfzMag").src = `${gfzQuicklookUrlYYYYMMDD(yyyy_mm_dd)}?ts=${Date.now()}`;
+  $("gfzTime").textContent = fmtTimeLocal();
+}
+
+function refreshOvation(){
+  $("ovationGlobal").src = `${NOAA.ovation}?ts=${Date.now()}`;
+  $("ovaTime").textContent = fmtTimeLocal();
+}
+
+function refreshAllMaps(){
+  refreshMTWetter();
+  refreshGFZQuicklook();
+  refreshOvation();
+}
+
+/***********************
+ * Main update
+ ***********************/
+async function updateAll(){
+  $("badgeLive").textContent = "lade…";
+
+  if(map && marker){
+    marker.setLatLng([currentLat, currentLon]);
+    map.setView([currentLat, currentLon], map.getZoom());
+  }
+
+  const [mag, plasma, kpTable] = await Promise.all([
+    fetchJson(NOAA.mag1d, 12000),
+    fetchJson(NOAA.plasma1d, 12000),
+    fetchJson(NOAA.kp, 12000)
+  ]);
+
+  let bz = null, spd = null, kp = null;
+
+  if(Array.isArray(mag)){
+    const last = lastValidRow(mag, 3);
+    bz = last ? Number(last[3]) : null;
+  }
+
+  if(Array.isArray(plasma)){
+    const last = lastValidRow(plasma, 2);
+    spd = last ? Number(last[2]) : null;
+  }
+
+  if(Array.isArray(kpTable)){
+    const rows = kpTable.filter(r => r?.[0] && !isNaN(Date.parse(r[0])));
+    if(rows.length){
+      kp = Number(rows[rows.length-1][1]);
     }
   }
 
-  // time often included separately
-  const issueTime = data.ObservationTime ?? data.observation_time ?? data.time_tag ?? null;
-  const time = issueTime ? new Date(String(issueTime).replace("Z","") + "Z") : null;
+  let cloud = null, moonIllum = null, isNight = false;
 
-  return { value: best ? best.val : null, time };
-}
+  const wx = await fetchJson(OPEN_METEO(currentLat, currentLon), 12000);
+  if(!isErr(wx)){
+    cloud = (wx.current?.cloud_cover ?? null);
+    isNight = (wx.current?.is_day === 0);
 
-// ---------- Open-Meteo clouds ----------
-async function getCloudCover(lat, lon){
-  const url = "https://api.open-meteo.com/v1/forecast?latitude=" + encodeURIComponent(lat) +
-              "&longitude=" + encodeURIComponent(lon) +
-              "&current=cloud_cover,weather_code" +
-              "&timezone=auto";
-  const data = await fetchJSON(url);
-  const cur = data.current || {};
-  const cloud = Number(cur.cloud_cover);
-  const wcode = cur.weather_code;
-  const time = cur.time ? new Date(cur.time) : null;
-  return { cloud, wcode, time };
-}
-
-// ---------- Score logic ----------
-function auroraLabelFromKp(kp){
-  if(!Number.isFinite(kp)) return "—";
-  if(kp >= 7) return "SEHR HOCH";
-  if(kp >= 6) return "HOCH";
-  if(kp >= 5) return "GUT";
-  if(kp >= 4) return "MÄSSIG";
-  return "RUHIG";
-}
-
-function cloudLabel(cloud){
-  if(!Number.isFinite(cloud)) return "—";
-  if(cloud <= 20) return "klar";
-  if(cloud <= 50) return "teilweise";
-  if(cloud <= 75) return "wolkig";
-  return "zu";
-}
-
-function normalizeAurora(ovationVal, kp, bz, speed){
-  // Build a 0..1 "activity" score from multiple cues.
-  // Ovation "Aurora" values can be 0..100-ish (varies). Normalize gently.
-  const ov = Number.isFinite(ovationVal) ? clamp(ovationVal / 80, 0, 1) : 0.0;
-  const kpn = Number.isFinite(kp) ? clamp((kp - 2) / 6, 0, 1) : 0.0;
-
-  // bz: negative helps, positive hurts
-  const bzN = Number.isFinite(bz) ? clamp((-bz) / 10, 0, 1) : 0.0;
-
-  // speed: higher helps (rough proxy)
-  const spN = Number.isFinite(speed) ? clamp((speed - 350) / 400, 0, 1) : 0.0;
-
-  // weighted blend
-  return clamp(0.45*ov + 0.30*kpn + 0.15*bzN + 0.10*spN, 0, 1);
-}
-
-function computeScoreNow({lat, lon, cloud, kp, bz, speed, ovationVal}){
-  const alt = sunAltitude(new Date(), lat, lon);
-  const dark = darknessClass(alt);
-
-  const activity = normalizeAurora(ovationVal, kp, bz, speed);
-  const cloudFactor = Number.isFinite(cloud) ? (1 - clamp(cloud/100, 0, 1)) : 0.6;
-
-  // the key: daylight kills visibility
-  const score = Math.round(100 * activity * cloudFactor * dark.factor);
-
-  return { score, dark, alt, activity, cloudFactor };
-}
-
-function computeScoreNight({lat, lon, cloud, kp, bz, speed, ovationVal}){
-  const win = nextNightFactorWindow(lat, lon);
-  const activity = normalizeAurora(ovationVal, kp, bz, speed);
-  const cloudFactor = Number.isFinite(cloud) ? (1 - clamp(cloud/100, 0, 1)) : 0.6;
-  const score = Math.round(100 * activity * cloudFactor * win.bestFactor);
-  return { score, bestTime: win.bestTime, bestFactor: win.bestFactor, activity, cloudFactor };
-}
-
-function decidePill(scoreNow, darkKey){
-  // decision is primarily for "go now". If day/civil, keep it conservative.
-  if(darkKey === "day"){
-    return { cls:"info", text:"JETZT: TAG (Planen statt rausgehen)" };
-  }
-  if(scoreNow >= 65) return { cls:"ok", text:"RAUSGEHEN: JA (gute Chancen)" };
-  if(scoreNow >= 35) return { cls:"warn", text:"RAUSGEHEN: VIELLEICHT (kommt drauf an)" };
-  return { cls:"bad", text:"RAUSGEHEN: EHER NEIN" };
-}
-
-// ---------- MTWetter image refresh ----------
-function refreshImages(){
-  document.querySelectorAll("img.autoRefresh").forEach(img => {
-    const base = img.dataset.src;
-    img.src = base + (base.includes("?") ? "&" : "?") + "t=" + Date.now();
-  });
-}
-
-// ---------- Source monitor ----------
-async function pingImage(url, timeoutMs=7000){
-  return new Promise(resolve => {
-    const img = new Image();
-    const t = setTimeout(() => resolve(false), timeoutMs);
-    img.onload = () => { clearTimeout(t); resolve(true); };
-    img.onerror = () => { clearTimeout(t); resolve(false); };
-    img.src = url + (url.includes("?") ? "&" : "?") + "t=" + Date.now();
-  });
-}
-
-function setSourceState(idDot, idNote, state, note){
-  setDot($(idDot), state);
-  $(idNote).textContent = note || "—";
-}
-
-// ---------- Main update ----------
-async function updateAll(){
-  setDot($("dotNow"), "info");
-  $("statusText").textContent = "lädt…";
-
-  const loc = {
-    name: $("locName").value.trim() || DEFAULTS.name,
-    lat: Number($("lat").value),
-    lon: Number($("lon").value),
-  };
-
-  $("locTitle").textContent = loc.name;
-
-  // Show immediate darkness info even if APIs fail
-  const alt = sunAltitude(new Date(), loc.lat, loc.lon);
-  const darkNow = darknessClass(alt);
-  $("kpiDark").textContent = darkNow.name;
-  $("kpiDarkHint").textContent = darkNow.hint;
-
-  // Default placeholders
-  $("kpiCloud").textContent = "—";
-  $("kpiCloudHint").textContent = "Open-Meteo lädt…";
-  $("kpiAurora").textContent = "—";
-  $("kpiAuroraHint").textContent = "NOAA Ovation lädt…";
-  $("kpiKp").textContent = "—";
-  $("kpiKpHint").textContent = "NOAA Kp lädt…";
-
-  // Fire image refresh
-  refreshImages();
-
-  // Load data in parallel
-  let kpData=null, sw=null, ov=null, cloud=null;
-
-  const tasks = [
-    (async()=>{ kpData = await getKpLatest(); })(),
-    (async()=>{ sw = await getSolarWindLatest(); })(),
-    (async()=>{ ov = await getOvationValueNear(loc.lat, loc.lon); })(),
-    (async()=>{ cloud = await getCloudCover(loc.lat, loc.lon); })(),
-  ];
-
-  // Source monitor pings
-  const pingTasks = [
-    (async()=>{
-      const ok = await pingImage("https://aurora.mtwetter.de/realtime/aurora_probability_map_nightMode.png");
-      setSourceState("s-mtwetter","note-mtwetter", ok ? "ok":"bad", ok ? "OK" : "Down/Timeout");
-    })(),
-    (async()=>{
-      // simple ping via a fetch try (NOAA)
-      try { await fetchJSON("https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json", 7000);
-        setSourceState("s-noaa","note-noaa","ok","OK");
-      } catch { setSourceState("s-noaa","note-noaa","bad","Down/Timeout"); }
-    })(),
-    (async()=>{
-      try { await fetchJSON("https://api.open-meteo.com/v1/forecast?latitude=50&longitude=10&current=cloud_cover&timezone=auto", 7000);
-        setSourceState("s-openmeteo","note-openmeteo","ok","OK");
-      } catch { setSourceState("s-openmeteo","note-openmeteo","bad","Down/Timeout"); }
-    })(),
-  ];
-
-  let okAll = true;
-  try{
-    await Promise.allSettled([...tasks, ...pingTasks]);
-  }catch{
-    okAll = false;
+    const mi = wx.daily?.moon_illumination?.[0] ?? null;
+    if(mi !== null){
+      const pct = (mi <= 1.01) ? mi * 100 : mi;
+      moonIllum = clamp(pct, 0, 100);
+    }
   }
 
-  // Fill UI from what we got
-  const kp = kpData?.kp;
-  const kpTime = kpData?.time;
-  if (Number.isFinite(kp)) {
-    $("kpiKp").textContent = fmt(kp, 1);
-    $("kpiKpHint").textContent = auroraLabelFromKp(kp) + (kpTime ? (" · " + kpTime.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})) : "");
-  } else {
-    $("kpiKpHint").textContent = "nicht verfügbar";
-    okAll = false;
+  const sun = await fetchJson(SUN_API(currentLat, currentLon), 12000);
+  if(!isErr(sun) && sun?.results){
+    $("sunrise").textContent = extractHHMM(sun.results.sunrise) || "--:--";
+    $("sunset").textContent  = extractHHMM(sun.results.sunset)  || "--:--";
+  }else{
+    $("sunrise").textContent = "--:--";
+    $("sunset").textContent  = "--:--";
   }
 
-  const bz = sw?.bz;
-  const speed = sw?.speed;
-  const density = sw?.density;
+  $("chipBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
+  $("chipKp").textContent = (kp !== null) ? kp.toFixed(1) : "--";
+  $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
+  $("uiNight").textContent = isNight ? "Ja" : "Nein";
 
-  const ovVal = ov?.value;
-  if (Number.isFinite(ovVal)) {
-    $("kpiAurora").textContent = fmt(ovVal, 0);
-    const t = ov?.time ? ov.time.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}) : "—";
-    $("kpiAuroraHint").textContent = "Ovation nahe Spot · " + t;
-  } else {
-    $("kpiAuroraHint").textContent = "nicht verfügbar";
-    okAll = false;
+  $("valCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--%";
+  $("valMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--%";
+
+  if(cloud === null){
+    $("valCloudTxt").textContent = "—";
+  }else if(cloud >= 85){
+    $("valCloudTxt").textContent = "Wolkig";
+  }else if(cloud >= 35){
+    $("valCloudTxt").textContent = "Teils klar";
+  }else{
+    $("valCloudTxt").textContent = "Klar";
   }
 
-  const cloudPct = cloud?.cloud;
-  if (Number.isFinite(cloudPct)) {
-    $("kpiCloud").textContent = fmt(cloudPct, 0) + "%";
-    const t = cloud?.time ? cloud.time.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"}) : "—";
-    $("kpiCloudHint").textContent = cloudLabel(cloudPct) + " · " + t;
-  } else {
-    $("kpiCloudHint").textContent = "nicht verfügbar";
-    okAll = false;
+  if(moonIllum === null){
+    $("valMoonTxt").textContent = "—";
+  }else if(moonIllum >= 75){
+    $("valMoonTxt").textContent = "Hell";
+  }else if(moonIllum >= 35){
+    $("valMoonTxt").textContent = "Mittel";
+  }else{
+    $("valMoonTxt").textContent = "Dunkel (top)";
   }
 
-  // Compute scores
-  const nowRes = computeScoreNow({
-    lat: loc.lat, lon: loc.lon,
-    cloud: cloudPct, kp, bz, speed, ovationVal: ovVal
-  });
+  const score = computeScore({ kp, bz, spd, cloud, moon: moonIllum, isNight });
 
-  const nightRes = computeScoreNight({
-    lat: loc.lat, lon: loc.lon,
-    cloud: cloudPct, kp, bz, speed, ovationVal: ovVal
-  });
+  $("miniWhy").textContent =
+    `Score ${score}/100 • ` +
+    `${isNight ? "Nacht" : "Tag/Dämmerung"} • ` +
+    `Kp ${kp !== null ? kp.toFixed(1) : "—"} • ` +
+    `Bz ${bz !== null ? bz.toFixed(1) : "—"} • ` +
+    `${cloud !== null ? Math.round(cloud)+"% Wolken" : "Wolken —"}`;
 
-  $("scoreNow").textContent = String(nowRes.score);
-  $("scoreNight").textContent = String(nightRes.score);
+  decideStatus(score, { isNight, cloud });
 
-  // Decision pill
-  const pill = decidePill(nowRes.score, nowRes.dark.key);
-  const goPill = $("goPill");
-  goPill.className = "pill " + pill.cls;
-  goPill.querySelector(".dot").className = "dot " + pill.cls;
-  $("goText").textContent = pill.text;
+  if(Array.isArray(mag)){
+    const slice = mag.slice(-70);
+    const labels = [];
+    const bzVals = [];
+    for(const r of slice){
+      const t = extractHHMM(r?.[0]);
+      const v = Number(r?.[3]);
+      if(t) labels.push(t);
+      bzVals.push(Number.isFinite(v) ? v : null);
+    }
+    renderChart(labels, bzVals);
+  }
 
-  // Explain line (human-friendly, photographer-friendly)
-  const parts = [];
-  parts.push("Dunkelheit: " + nowRes.dark.name);
-  if (Number.isFinite(cloudPct)) parts.push("Wolken: " + fmt(cloudPct,0) + "%");
-  if (Number.isFinite(kp)) parts.push("Kp: " + fmt(kp,1));
-  if (Number.isFinite(bz)) parts.push("Bz: " + fmt(bz,1) + " nT");
-  if (Number.isFinite(speed)) parts.push("Speed: " + fmt(speed,0) + " km/s");
-  $("decisionExplain").textContent =
-    parts.join(" · ") +
-    (nowRes.dark.key === "day" ? " · Tagsüber = praktisch nicht sichtbar → Score runter." : "");
+  $("badgeLive").textContent = "live";
 
-  // Update status
-  const upd = new Date();
-  $("lastUpdate").textContent = upd.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
-
-  $("statusText").textContent = okAll ? "OK" : "teilweise";
-  setDot($("dotNow"), okAll ? "ok" : "warn");
+  refreshAllMaps();
 }
 
-// ---------- Wire up ----------
-function init(){
-  const loc = loadLocation();
-  $("locName").value = loc.name;
-  $("lat").value = loc.lat;
-  $("lon").value = loc.lon;
+/***********************
+ * Events
+ ***********************/
+$("btnUpdate").addEventListener("click", updateAll);
 
-  $("locTitle").textContent = loc.name;
-  $("autoEvery").textContent = Math.round(AUTO_REFRESH_MS/1000) + "s";
-
-  $("btnUpdate").addEventListener("click", updateAll);
-  $("btnSave").addEventListener("click", () => {
-    const loc2 = {
-      name: $("locName").value.trim() || DEFAULTS.name,
-      lat: Number($("lat").value),
-      lon: Number($("lon").value),
-    };
-    saveLocation(loc2);
-    // tiny feedback
-    $("statusText").textContent = "gespeichert";
-    setDot($("dotNow"), "info");
-    setTimeout(()=>updateAll(), 250);
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+    tab.classList.add("active");
+    const id = tab.getAttribute("data-target");
+    const el = document.getElementById(id);
+    if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
   });
+});
 
-  // First load
-  updateAll();
+/***********************
+ * INIT
+ ***********************/
+async function init(){
+  safeImg("mtMap");
+  safeImg("gfzMag");
+  safeImg("ovationGlobal");
 
-  // Auto refresh
-  setInterval(updateAll, AUTO_REFRESH_MS);
-  // refresh map images more often? keep same cycle for simplicity
-  setInterval(refreshImages, AUTO_REFRESH_MS);
+  splashProgress(10, "GPS…");
+  await initGPS();
+
+  splashProgress(35, "Karte…");
+  setupMap();
+
+  splashProgress(55, "Ort…");
+  await reverseGeocodeCity();
+
+  splashProgress(75, "Sensoren…");
+  await updateAll();
+
+  splashProgress(100, "Fertig");
+  setTimeout(hideSplash, 350);
+
+  setInterval(updateAll, 60000);
+  setInterval(refreshAllMaps, 300000);
 }
 
 init();
