@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>AURORA X — v9.1</title>
+  <title>AURORA X — v10</title>
   <meta name="description" content="Polarlicht-Radar: Jetzt-Status, Nachtprognose, Polarlichtoval und Alarm für deinen Standort." />
   <meta name="theme-color" content="#070707" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -169,6 +169,13 @@
     .row:first-child{ border-top:0; }
     .tnum{ font-variant-numeric:tabular-nums; }
     .legend-dot{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+    .alert-item{ display:flex; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
+    .alert-item:first-child{ border-top:0; }
+    .alert-item.expired{ opacity:.5; }
+    .alert-dot{ flex:0 0 8px; height:8px; border-radius:99px; margin-top:6px; }
+    .icon-btn{ width:34px; height:34px; border-radius:10px; border:1px solid var(--border); background:rgba(127,127,127,.10); font-weight:900; }
+    #noaaNote{ border:1px solid rgba(245,158,11,.35); border-radius:12px; padding:8px 10px; color:#f59e0b; }
+    html.light #noaaNote{ color:#b45309; }
 
     /* Rotlicht-Modus: schützt die Dunkeladaption der Augen */
     #redFilter{ position:fixed; inset:0; background:#ff0000; mix-blend-mode:multiply; pointer-events:none; z-index:1000000; display:none; }
@@ -206,6 +213,7 @@
           <div class="flex gap-2 mt-2 flex-wrap">
             <span class="badge" id="badgeLive">offline</span>
             <span class="badge" id="cityName">📍 Standort…</span>
+            <span class="badge" id="gBadge" style="display:none"></span>
           </div>
         </div>
         <button id="btnUpdate" class="btn btn-primary" type="button">Update</button>
@@ -242,6 +250,8 @@
       </div>
 
       <div class="mt-4 text-[11px] text-white/45 text-center" id="miniWhy">—</div>
+      <div class="mt-3 text-[12px] text-white/70 text-center" id="arrival"></div>
+      <div class="mt-3 text-[12px] text-center" id="noaaNote" style="display:none"></div>
 
       <div class="mt-5 flex gap-2 justify-center flex-wrap">
         <button id="btnAlert" class="btn btn-sm" type="button">🔔 Alarm aus</button>
@@ -270,6 +280,20 @@
       <div class="mt-2 text-[11px] text-white/45">
         Kp-Prognose von NOAA (3-Stunden-Blöcke), Wolken von Open-Meteo. Über 24 h hinaus ist Polarlicht kaum vorhersagbar, nimm die Werte als Tendenz.
       </div>
+
+      <div class="flex items-center justify-between gap-2 flex-wrap mt-6 mb-2">
+        <div class="badge">NOAA-Warnungen · 48 h</div>
+        <span class="badge" id="gScaleTag">—</span>
+      </div>
+      <div id="alerts" class="text-sm"><div class="row text-white/45">Lade…</div></div>
+      <div id="gDays" class="mt-2 flex gap-2 flex-wrap"></div>
+
+      <div class="badge mt-6 mb-2">27-Tage-Ausblick (NOAA)</div>
+      <div id="outlook27" style="display:flex;align-items:flex-end;gap:2px;height:70px"></div>
+      <div id="outlook27Labels" class="flex justify-between text-[10px] text-white/45 mt-1 tnum"></div>
+      <div class="mt-2 text-[11px] text-white/45" id="outlook27Note">
+        Größter erwarteter Kp pro Tag. Die Sonne dreht sich in 27 Tagen einmal, aktive Regionen und Koronalöcher kommen oft wieder. Nur grobe Tendenz.
+      </div>
     </section>
 
     <!-- KARTE -->
@@ -290,14 +314,36 @@
         </div>
       </div>
       <div class="mt-3 flex gap-2 flex-wrap items-center">
+        <span class="text-[11px] text-white/55">Ebenen:</span>
+        <button id="lyOval" class="btn btn-sm" type="button">Oval</button>
+        <button id="lyClouds" class="btn btn-sm" type="button">Wolken</button>
+        <button id="lySat" class="btn btn-sm" type="button">Satellit</button>
+      </div>
+      <div class="mt-1 text-[10px] text-white/40" id="layerNote"></div>
+
+      <div class="card p-3 mt-3">
+        <div class="text-[11px] text-white/55 mb-1">Wolkenlücken-Finder (Umkreis ~120 km)</div>
+        <div class="text-sm" id="gapTxt">—</div>
+        <button id="btnGap" class="btn btn-sm mt-2" type="button" style="display:none">→ Pin dorthin</button>
+      </div>
+
+      <div class="mt-3 flex gap-2 flex-wrap items-center">
         <button id="btnGps" class="btn btn-sm" type="button">◎ Mein Standort</button>
+        <button id="btnSaveSpot" class="btn btn-sm" type="button">★ Spot speichern</button>
         <span class="text-[11px] text-white/45">Pin ziehen oder in die Karte tippen, um einen Spot zu prüfen.</span>
       </div>
+
+      <div class="flex items-center justify-between gap-2 flex-wrap mt-5 mb-1">
+        <div class="badge">Meine Spots</div>
+        <span class="badge" id="spotsTag">—</span>
+      </div>
+      <div id="spots" class="text-sm"></div>
       <div class="mt-3 flex gap-3 text-[10px] text-white/45 flex-wrap">
         <span><span class="legend-dot" style="background:rgba(34,197,94,.5)"></span> 5–20 %</span>
         <span><span class="legend-dot" style="background:rgba(250,204,21,.6)"></span> 20–50 %</span>
         <span><span class="legend-dot" style="background:rgba(239,68,68,.7)"></span> &gt; 50 %</span>
         <span>– – Sichtlinie (geschätzt)</span>
+        <span><span class="legend-dot" style="background:rgba(160,170,180,.6)"></span> Wolken</span>
       </div>
     </section>
 
@@ -595,6 +641,9 @@ const NOAA = {
   kp1m:       "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",
   kpForecast: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index-forecast.json",
   rtswMag:    "https://services.swpc.noaa.gov/json/rtsw/rtsw_mag_1m.json",
+  alerts:     "https://services.swpc.noaa.gov/products/alerts.json",
+  scales:     "https://services.swpc.noaa.gov/products/noaa-scales.json",
+  outlook27:  "https://services.swpc.noaa.gov/text/27-day-outlook.txt",
   rtswWind:   "https://services.swpc.noaa.gov/json/rtsw/rtsw_wind_1m.json",
   ovationJson:"https://services.swpc.noaa.gov/json/ovation_aurora_latest.json",
   ovation:    "https://services.swpc.noaa.gov/images/aurora-forecast-northern-hemisphere.jpg"
@@ -615,6 +664,11 @@ const state = {
   kpForecast: [],   // [{t, v}]
   wx: null,         // { current, hourly:[{t, low, mid, high, total}], sunrise, sunset }
   oval: null,       // { time, grid: Map("lon,lat" -> %) }
+  alerts: null,      // [{t, head, de, g, kp, valid, expired}]
+  scales: null,      // [{k, date, g}]
+  outlook: [],       // [{d, kp}]
+  cloudGrid: null,   // {cells:[{lat, lon, cloud}]}
+  spotWx: new Map(), // id -> {now, hourly}
   lastLevel: "quiet",
   lastNotify: 0
 };
@@ -623,9 +677,12 @@ const settings = {
   level: store("level") || "chance",
   spot: store("spot") || "dark",
   red: store("red") === "1",
-  theme: store("theme") || "auto"
+  theme: store("theme") || "auto",
+  layers: Object.assign({ oval:true, clouds:true, sat:false }, safeJson(store("layers")) || {})
 };
-let map, marker, ovalLayer, viewLine, chartMain = null;
+function safeJson(v){ try{ return v ? JSON.parse(v) : null; }catch(e){ return null; } }
+let spots = (safeJson(store("spots")) || []).filter(x => x && Number.isFinite(x.lat) && Number.isFinite(x.lon));
+let map, marker, ovalLayer, cloudLayer, satLayer, viewLine, chartMain = null;
 let updating = false, lastUpdate = 0, wxKey = "";
 
 /***********************
@@ -708,6 +765,7 @@ function moveTo(lat, lon, recenter){
   if(map && recenter) map.setView([lat, lon], Math.max(map.getZoom(), 6));
   reverseGeocodeCity();
   updateAll(true);
+  loadCloudGrid();
 }
 
 /***********************
@@ -726,7 +784,11 @@ function setupMap(){
   labels.style.pointerEvents = "none";
   setBaseMap();
 
-  ovalLayer = L.layerGroup().addTo(map);
+  ovalLayer = L.layerGroup();
+  cloudLayer = L.layerGroup();
+  if(settings.layers.clouds) cloudLayer.addTo(map);
+  if(settings.layers.oval) ovalLayer.addTo(map);
+  if(settings.layers.sat) setSat(true);
   marker = L.marker([state.lat, state.lon], { draggable:true }).addTo(map);
   marker.on("dragend", () => { const p = marker.getLatLng(); moveTo(p.lat, p.lng, false); });
   map.on("click", (e) => moveTo(e.latlng.lat, e.latlng.lng, false));
@@ -950,7 +1012,7 @@ async function loadSpace(){
     .filter(p => p.v !== null && p.t.getTime() + 3*3600000 > now);
 
   state.space = {
-    kp: kpPt?.v ?? null, bz: bzPt?.v ?? null, bz15, spd: spdPt?.v ?? null, den: denPt?.v ?? null,
+    kp: kpPt?.v ?? null, bz: bzPt?.v ?? null, bzT: bzPt?.t ?? null, bz15, spd: spdPt?.v ?? null, den: denPt?.v ?? null,
     southMin, bzSeries, btSeries
   };
   state.kpForecast = kpForecast;
@@ -984,11 +1046,11 @@ function kpForecastAt(date){
   const slot = state.kpForecast.find(p => t >= p.t.getTime() && t < p.t.getTime() + 3*3600000);
   return slot ? slot.v : null;
 }
-function cloudAt(date){
-  if(!state.wx?.hourly?.length) return null;
+function cloudAt(date, hourly = state.wx?.hourly){
+  if(!hourly?.length) return null;
   const t = date.getTime();
   let best = null, dist = Infinity;
-  for(const hh of state.wx.hourly){
+  for(const hh of hourly){
     const d = Math.abs(hh.t.getTime() - t);
     if(d < dist){ dist = d; best = hh; }
   }
@@ -996,11 +1058,10 @@ function cloudAt(date){
 }
 
 /* Score für einen Zeitpunkt in der Zukunft (nur Kp-Prognose, Wolken, Sonne, Mond) */
-function forecastScore(date){
-  const { lat, lon } = state;
+function forecastScore(date, lat = state.lat, lon = state.lon, hourly = state.wx?.hourly){
   const dark = darkness(sunAltitude(date, lat, lon));
   const kp = kpForecastAt(date);
-  const cloud = cloudAt(date);
+  const cloud = cloudAt(date, hourly);
   const need = kpNeeded(magLatitude(lat, lon));
   const act = activityFactor(kp, need, null);
   const sky = skyFactor({ cloud, dark, moonIllum: moonIllumination(date), moonAlt: moonAltitude(date, lat, lon) });
@@ -1023,25 +1084,29 @@ function setStatus(label, cls, rec){
   $("mainRec").textContent = rec;
 }
 
+/* Aktueller Score für beliebigen Ort (Weltraumdaten sind überall gleich, Ort bestimmt den Rest) */
+function nowScoreAt(lat, lon, cloud, date = new Date()){
+  const sp = state.space || {};
+  const sunAlt = sunAltitude(date, lat, lon);
+  const dark = darkness(sunAlt);
+  const moonIllum = moonIllumination(date);
+  const moonAlt = moonAltitude(date, lat, lon);
+  const mlat = magLatitude(lat, lon);
+  const need = kpNeeded(mlat);
+  const ovalPct = ovalAt(lat, lon);
+  const kpEff = effectiveKp(sp.kp ?? null, sp.bz15 ?? sp.bz ?? null, sp.spd ?? null);
+  const act = activityFactor(kpEff, need, ovalPct);
+  const sky = skyFactor({ cloud, dark, moonIllum, moonAlt });
+  return { sunAlt, dark, moonIllum, moonAlt, mlat, need, ovalPct, kpEff, act, sky, score: Math.round(100 * act * sky) };
+}
+
 function renderNow(){
   applyTheme();
   const { lat, lon } = state;
   const sp = state.space || {};
   const now = new Date();
-
-  const sunAlt = sunAltitude(now, lat, lon);
-  const dark = darkness(sunAlt);
-  const moonIllum = moonIllumination(now);
-  const moonAlt = moonAltitude(now, lat, lon);
   const cloud = state.wx ? effectiveCloud(state.wx.current) : null;
-  const mlat = magLatitude(lat, lon);
-  const need = kpNeeded(mlat);
-  const ovalPct = ovalAt(lat, lon);
-  const kpEff = effectiveKp(sp.kp ?? null, sp.bz15 ?? sp.bz ?? null, sp.spd ?? null);
-
-  const act = activityFactor(kpEff, need, ovalPct);
-  const sky = skyFactor({ cloud, dark, moonIllum, moonAlt });
-  const score = Math.round(100 * act * sky);
+  const { sunAlt, dark, moonIllum, moonAlt, mlat, need, ovalPct, kpEff, act, sky, score } = nowScoreAt(lat, lon, cloud, now);
   const lvl = levelOf(score, dark);
   const hasSpace = sp.kp != null || sp.bz != null;
 
@@ -1267,6 +1332,8 @@ async function updateAll(force=false){
     const res = renderNow();
     renderForecast();
     renderChartData();
+    renderArrival();
+    renderSpots();
     checkAlert(res);
     const ok = [okSpace, okWx].filter(Boolean).length;
     setLiveBadge(ok === 2 ? "live" : ok === 1 ? "partial" : "offline");
@@ -1281,13 +1348,374 @@ async function updateAll(force=false){
 
 async function refreshSlow(){
   refreshImages();
-  if(await loadOval()) renderNow();
+  if(satLayer) satLayer.setParams({ _ts: Math.floor(Date.now() / 600000) });
+  loadOutlook();
+  loadCloudGrid();
+  loadSpotsWeather();
+  if(await loadOval()){ renderNow(); renderSpots(); }
+}
+
+
+/***********************
+ * Ankunft des Sonnenwinds (L1 -> Erde)
+ ***********************/
+const L1_KM = 1.5e6;
+function renderArrival(){
+  const sp = state.space, el = $("arrival");
+  if(!sp || sp.spd == null || !sp.bzT){ el.textContent = ""; return; }
+  const min = Math.round(L1_KM / sp.spd / 60);
+  const at = new Date(sp.bzT.getTime() + min*60000);
+  const what = sp.bz != null ? `Bz ${sp.bz.toFixed(1)} nT` : "Der Sonnenwind";
+  const late = at < new Date() ? " (schon da)" : "";
+  el.innerHTML = `⏱ ${what}, gemessen ${fmtTime(sp.bzT)} am L1-Punkt, erreicht die Erde bei ${Math.round(sp.spd)} km/s ` +
+                 `in ca. <b>${min} min</b>, also ≈ <b>${fmtTime(at)}</b>${late}.`;
+}
+
+/***********************
+ * NOAA-Warnungen, G-Skala, 27-Tage-Ausblick
+ ***********************/
+async function fetchText(url, timeoutMs=12000){
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try{
+    const res = await fetch(url, { cache:"no-store", signal: ctrl.signal });
+    return res.ok ? await res.text() : null;
+  }catch(e){ return null; }
+  finally{ clearTimeout(t); }
+}
+const MONTHS = { Jan:0, Feb:1, Mar:2, Apr:3, May:4, Jun:5, Jul:6, Aug:7, Sep:8, Oct:9, Nov:10, Dec:11 };
+/* "2026 Nov 08 2100 UTC" -> Date */
+function noaaTextTime(str){
+  const m = String(str || "").match(/(\d{4})\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d{2})(\d{2})\s*UTC/);
+  if(!m || MONTHS[m[2]] === undefined) return null;
+  return new Date(Date.UTC(+m[1], MONTHS[m[2]], +m[3], +m[4], +m[5]));
+}
+function translateHeadline(h){
+  const rules = [
+    [/^CANCEL/i, () => "Aufgehoben: " + h.replace(/^[A-Z ]+:\s*/i, "")],
+    [/WATCH: Geomagnetic Storm Category (G\d) Predicted/i, m => `Vorhersage: geomagnetischer Sturm ${m[1]}`],
+    [/EXTENDED WARNING: Geomagnetic K-index of (\d)/i, m => `Warnung verlängert: Kp ${m[1]} oder mehr`],
+    [/WARNING: Geomagnetic K-index of (\d)/i, m => `Warnung: Kp ${m[1]} oder mehr erwartet`],
+    [/ALERT: Geomagnetic K-index of (\d)/i, m => `Erreicht: Kp ${m[1]}`],
+    [/WARNING: Geomagnetic Sudden Impulse/i, () => "Warnung: Stoßwelle (CME) trifft bald ein"],
+    [/SUMMARY: Geomagnetic Sudden Impulse/i, () => "Stoßwelle eingetroffen, CME/Sonnenwind trifft die Erde"],
+    [/Interplanetary Shock/i, () => "Schockfront im Sonnenwind gemessen"],
+    [/Geomagnetic Storm Category (G\d)/i, m => `Geomagnetischer Sturm ${m[1]}`]
+  ];
+  for(const [re, fn] of rules){ const m = h.match(re); if(m) return fn(m); }
+  return h;
+}
+function parseAlerts(json){
+  if(!Array.isArray(json)) return null;
+  const now = Date.now(), cutoff = now - 48*3600000;
+  const out = [], seen = new Set();
+  const list = json.map(a => ({ t: parseUtc(a?.issue_datetime), msg: String(a?.message || "") }))
+                   .filter(a => a.t && a.t.getTime() >= cutoff)
+                   .sort((a,b) => b.t - a.t);
+  for(const a of list){
+    const lines = a.msg.split(/\r?\n/).map(x => x.trim());
+    const head = lines.find(l => /^(WATCH|WARNING|ALERT|EXTENDED WARNING|SUMMARY|CANCEL[A-Z ]*):/i.test(l));
+    if(!head || !/geomagnetic|k-index|shock|impulse|cme/i.test(head)) continue;
+    if(seen.has(head)) continue;
+    seen.add(head);
+    const validLine = lines.find(l => /Valid (To|Until)/i.test(l));
+    const valid = validLine ? noaaTextTime(validLine) : null;
+    const g = head.match(/G(\d)/i), k = head.match(/K-index of (\d)/i);
+    out.push({ t:a.t, head, de: translateHeadline(head), g: g ? +g[1] : null, kp: k ? +k[1] : null,
+               valid, expired: (valid && valid.getTime() < now) || /^CANCEL/i.test(head) });
+  }
+  return out;
+}
+function parseScales(j){
+  if(!j || typeof j !== "object" || isErr(j)) return null;
+  const out = [];
+  for(const k of ["0","1","2","3"]){
+    const d = j[k];
+    if(!d) continue;
+    out.push({ k:+k, date: d.DateStamp ? new Date(d.DateStamp + "T00:00:00Z") : null, g: num(d.G?.Scale) });
+  }
+  return out;
+}
+function parse27(txt){
+  if(typeof txt !== "string") return [];
+  const out = [];
+  for(const line of txt.split(/\r?\n/)){
+    const m = line.match(/^\s*(\d{4})\s+([A-Za-z]{3})\s+(\d{1,2})\s+(\d+)\s+(\d+)\s+(\d+)\s*$/);
+    if(m && MONTHS[m[2]] !== undefined) out.push({ d: new Date(Date.UTC(+m[1], MONTHS[m[2]], +m[3])), ap:+m[5], kp:+m[6] });
+  }
+  return out;
+}
+async function loadOutlook(){
+  const [alerts, scales, txt] = await Promise.all([fetchJson(NOAA.alerts), fetchJson(NOAA.scales), fetchText(NOAA.outlook27)]);
+  state.alerts = parseAlerts(alerts);
+  state.scales = parseScales(scales);
+  state.outlook = parse27(txt);
+  renderOutlook();
+}
+const G_TEXT = { 0:"kein Sturm", 1:"schwach", 2:"mäßig", 3:"stark", 4:"schwer", 5:"extrem" };
+function kpColor(kp){ return kp >= 7 ? "var(--red)" : kp >= 5 ? "var(--amber)" : kp >= 4 ? "var(--green)" : "var(--quiet)"; }
+
+function renderOutlook(){
+  // Warnungen
+  const box = $("alerts");
+  if(state.alerts === null){
+    box.innerHTML = '<div class="row text-white/45">Warnungen gerade nicht abrufbar.</div>';
+  }else if(!state.alerts.length){
+    box.innerHTML = '<div class="row text-white/45">Keine geomagnetischen Warnungen in den letzten 48 h.</div>';
+  }else{
+    box.innerHTML = state.alerts.slice(0, 6).map(a => {
+      const color = a.expired ? "var(--quiet)" : (a.g >= 3 || a.kp >= 7) ? "var(--red)" : "var(--amber)";
+      const valid = a.valid ? ` · gültig bis ${fmtDay(a.valid)} ${fmtTime(a.valid)}` : "";
+      return `<div class="alert-item${a.expired ? " expired" : ""}"><span class="alert-dot" style="background:${color}"></span>` +
+             `<div><div class="font-bold">${escapeHtml(a.de)}</div>` +
+             `<div class="text-[11px] text-white/45">${fmtDay(a.t)} ${fmtTime(a.t)}${valid}${a.expired ? " · abgelaufen" : ""}</div></div></div>`;
+    }).join("");
+  }
+
+  // G-Skala heute und Prognose
+  const sc = state.scales || [];
+  const cur = sc.find(x => x.k === 0);
+  $("gScaleTag").innerHTML = cur && cur.g !== null ? `jetzt <b>G${cur.g}</b> · ${G_TEXT[cur.g] || ""}` : "G-Skala —";
+  $("gDays").innerHTML = sc.filter(x => x.k > 0).map(x =>
+    `<span class="badge" style="${x.g ? "color:" + (x.g >= 3 ? "var(--red)" : "var(--amber)") + ";border-color:currentColor" : ""}">` +
+    `${x.date ? fmtDay(x.date) : "+" + x.k} <b style="color:inherit">${x.g !== null ? "G" + x.g : "–"}</b></span>`
+  ).join("");
+
+  // 27 Tage
+  const o = state.outlook.filter(x => x.d.getTime() >= Date.now() - 86400000);
+  const bars = $("outlook27");
+  if(!o.length){
+    bars.innerHTML = '<div class="text-[11px] text-white/45">Ausblick gerade nicht abrufbar.</div>';
+    $("outlook27Labels").innerHTML = "";
+  }else{
+    bars.innerHTML = o.map(x =>
+      `<div title="${fmtDay(x.d)}: Kp ${x.kp}" style="flex:1;height:${Math.max(6, x.kp/9*100)}%;background:${kpColor(x.kp)};border-radius:3px 3px 0 0"></div>`
+    ).join("");
+    const pick = [0, Math.floor(o.length/3), Math.floor(2*o.length/3), o.length-1];
+    $("outlook27Labels").innerHTML = pick.map(i => `<span>${o[i].d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit"})}</span>`).join("");
+    const hot = o.filter(x => x.kp >= 5);
+    $("outlook27Note").textContent = (hot.length
+      ? `Kp 5+ erwartet am ${hot.slice(0, 6).map(x => x.d.toLocaleDateString("de-DE", {day:"2-digit", month:"2-digit"})).join(", ")} · `
+      : "Keine Tage mit Kp 5+ erwartet · ") +
+      "Die Sonne dreht sich in 27 Tagen einmal, aktive Regionen kommen oft wieder. Nur grobe Tendenz.";
+  }
+
+  // Kopf-Badge + Hinweis auf der Startseite
+  const active = (state.alerts || []).filter(a => !a.expired);
+  const gNow = cur?.g ?? 0;
+  const gNext = Math.max(0, ...sc.filter(x => x.k > 0).map(x => x.g ?? 0));
+  const badge = $("gBadge");
+  if(gNow > 0){
+    badge.style.display = ""; badge.innerHTML = `⚡ <b style="color:inherit">G${gNow}</b> Sturm`;
+    badge.style.color = gNow >= 3 ? "var(--red)" : "var(--amber)"; badge.style.borderColor = "currentColor";
+  }else if(gNext > 0){
+    badge.style.display = ""; badge.innerHTML = `⚡ G${gNext} erwartet`;
+    badge.style.color = "var(--amber)"; badge.style.borderColor = "currentColor";
+  }else badge.style.display = "none";
+  const note = $("noaaNote");
+  if(active.length){
+    note.style.display = "";
+    note.textContent = `⚠ NOAA: ${active[0].de}${active[0].valid ? ` (bis ${fmtTime(active[0].valid)})` : ""}`;
+  }else note.style.display = "none";
+}
+function escapeHtml(t){ return String(t).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
+
+/***********************
+ * Wolken auf der Karte: Satellit + Raster + Lücken-Finder
+ ***********************/
+function distKm(a, b, c, d){
+  const R = 6371, dLat = (c-a)*RAD, dLon = (d-b)*RAD;
+  const x = Math.sin(dLat/2)**2 + Math.cos(a*RAD)*Math.cos(c*RAD)*Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+function bearing(a, b, c, d){
+  const y = Math.sin((d-b)*RAD) * Math.cos(c*RAD);
+  const x = Math.cos(a*RAD)*Math.sin(c*RAD) - Math.sin(a*RAD)*Math.cos(c*RAD)*Math.cos((d-b)*RAD);
+  const deg = (Math.atan2(y, x) / RAD + 360) % 360;
+  return ["N","NNO","NO","ONO","O","OSO","SO","SSO","S","SSW","SW","WSW","W","WNW","NW","NNW"][Math.round(deg / 22.5) % 16];
+}
+
+/* Open-Meteo kann viele Orte in einer Abfrage: Liefert je Ort {current, hourly} */
+async function fetchCloudsMulti(points, withHourly){
+  if(!points.length) return [];
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${points.map(p => p[0].toFixed(3)).join(",")}` +
+              `&longitude=${points.map(p => p[1].toFixed(3)).join(",")}&current=${CLOUD_VARS}` +
+              (withHourly ? `&hourly=${CLOUD_VARS}&forecast_days=2` : "") + `&timezone=GMT`;
+  const res = await fetchJson(url, 15000);
+  if(isErr(res)) return null;
+  const arr = Array.isArray(res) ? res : [res];
+  return arr.map(r => {
+    const c = r?.current || {}, h = r?.hourly || {};
+    return {
+      now: effectiveCloud({ low:c.cloud_cover_low, mid:c.cloud_cover_mid, high:c.cloud_cover_high, total:c.cloud_cover }),
+      hourly: (h.time || []).map((t, i) => ({ t: omTime(t, 0), low:h.cloud_cover_low?.[i], mid:h.cloud_cover_mid?.[i], high:h.cloud_cover_high?.[i], total:h.cloud_cover?.[i] }))
+    };
+  });
+}
+
+let gapTarget = null, cloudGridAt = 0, cloudGridKey = "";
+async function loadCloudGrid(){
+  const { lat, lon } = state;
+  const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+  if(key === cloudGridKey && Date.now() - cloudGridAt < 10*60000) return;
+  const dLat = 0.35, dLon = 0.35 / Math.max(0.3, Math.cos(lat*RAD)); // ca. 39 km Raster
+  const pts = [];
+  for(let i = -3; i <= 3; i++) for(let j = -3; j <= 3; j++) pts.push([lat + i*dLat, lon + j*dLon]);
+  const res = await fetchCloudsMulti(pts, false);
+  if(!res){ state.cloudGrid = null; $("gapTxt").textContent = "Wolkendaten gerade nicht abrufbar."; return; }
+  cloudGridKey = key; cloudGridAt = Date.now();
+  state.cloudGrid = { dLat, dLon, cells: pts.map((p, i) => ({ lat:p[0], lon:p[1], cloud: res[i]?.now ?? null })).filter(c => c.cloud !== null) };
+  drawCloudGrid();
+  renderGap();
+}
+function drawCloudGrid(){
+  if(!map || !cloudLayer || !state.cloudGrid) return;
+  cloudLayer.clearLayers();
+  const { dLat, dLon, cells } = state.cloudGrid;
+  const light = currentTheme() === "light";
+  for(const c of cells){
+    if(c.cloud < 8) continue;
+    L.rectangle([[c.lat - dLat/2, c.lon - dLon/2], [c.lat + dLat/2, c.lon + dLon/2]], {
+      stroke:false, interactive:false,
+      fillColor: light ? "#5b6470" : "#c7ccd3", fillOpacity: c.cloud / 100 * 0.6
+    }).addTo(cloudLayer);
+  }
+}
+function renderGap(){
+  const g = state.cloudGrid;
+  if(!g || !g.cells.length){ $("gapTxt").textContent = "—"; $("btnGap").style.display = "none"; return; }
+  const { lat, lon } = state;
+  const here = state.wx ? effectiveCloud(state.wx.current) : g.cells.reduce((b, c) => distKm(lat, lon, c.lat, c.lon) < distKm(lat, lon, b.lat, b.lon) ? c : b).cloud;
+  let best = null, bestVal = Infinity;
+  for(const c of g.cells){
+    const d = distKm(lat, lon, c.lat, c.lon);
+    const v = c.cloud + d * 0.08; // 100 km Umweg "kosten" 8 % Wolken
+    if(v < bestVal){ bestVal = v; best = { ...c, d }; }
+  }
+  gapTarget = null;
+  if(here !== null && here <= 20){
+    $("gapTxt").innerHTML = `Hier ist es schon ziemlich klar (<b>${here}%</b> Wolken).`;
+  }else if(best && best.d > 8 && here !== null && best.cloud <= here - 20){
+    gapTarget = best;
+    $("gapTxt").innerHTML = `Klarer: <b>${Math.round(best.d)} km ${bearing(lat, lon, best.lat, best.lon)}</b>, ${best.cloud}% Wolken (hier ${here}%).`;
+  }else{
+    $("gapTxt").innerHTML = `Im Umkreis ist es nirgends deutlich klarer (hier ${here ?? "–"}%).`;
+  }
+  $("btnGap").style.display = gapTarget ? "" : "none";
+}
+function setSat(on){
+  if(!map) return;
+  if(on && !satLayer){
+    // Meteosat Infrarot 10,8 µm: zeigt Wolken auch nachts (nur Europa/Afrika)
+    satLayer = L.tileLayer.wms("https://view.eumetsat.int/geoserver/wms", {
+      layers: "msg_fes:ir108", format: "image/png", transparent: true, version: "1.3.0",
+      opacity: 0.5, attribution: "Satellit &copy; EUMETSAT"
+    });
+    let errs = 0;
+    satLayer.on("tileerror", () => { if(++errs === 4) $("layerNote").textContent = "Satellitenbild gerade nicht verfügbar."; });
+    satLayer.on("tileload", () => { $("layerNote").textContent = "Satellit: Meteosat Infrarot, helle Flächen = Wolken (auch nachts)."; });
+  }
+  if(on) satLayer.addTo(map); else if(satLayer) map.removeLayer(satLayer);
+}
+function renderLayerButtons(){
+  $("lyOval").classList.toggle("on", settings.layers.oval);
+  $("lyClouds").classList.toggle("on", settings.layers.clouds);
+  $("lySat").classList.toggle("on", settings.layers.sat);
+}
+function toggleLayer(name){
+  settings.layers[name] = !settings.layers[name];
+  store("layers", JSON.stringify(settings.layers));
+  renderLayerButtons();
+  if(!map) return;
+  if(name === "oval") settings.layers.oval ? ovalLayer.addTo(map) : map.removeLayer(ovalLayer);
+  if(name === "clouds") settings.layers.clouds ? cloudLayer.addTo(map) : map.removeLayer(cloudLayer);
+  if(name === "sat"){ setSat(settings.layers.sat); if(!settings.layers.sat) $("layerNote").textContent = ""; }
+}
+
+/***********************
+ * Meine Spots
+ ***********************/
+let spotsWxAt = 0;
+function saveSpots(){ store("spots", JSON.stringify(spots)); }
+async function loadSpotsWeather(force=false){
+  if(!spots.length){ renderSpots(); return; }
+  if(!force && Date.now() - spotsWxAt < 15*60000 && spots.every(s => state.spotWx.has(s.id))){ renderSpots(); return; }
+  const res = await fetchCloudsMulti(spots.map(s => [s.lat, s.lon]), true);
+  if(res){
+    spotsWxAt = Date.now();
+    spots.forEach((s, i) => state.spotWx.set(s.id, res[i]));
+  }
+  renderSpots();
+}
+function spotTonight(s, wx){
+  const now = new Date();
+  const win = darkWindow(now, s.lat, s.lon);
+  if(!win) return null;
+  let best = null;
+  for(let t = Math.max(win.start.getTime(), now.getTime()); t <= win.end.getTime(); t += 3600000){
+    const f = forecastScore(new Date(t), s.lat, s.lon, wx?.hourly);
+    if(!best || f.score > best.score) best = f;
+  }
+  return best;
+}
+function renderSpots(){
+  const box = $("spots");
+  if(!spots.length){
+    box.innerHTML = '<div class="row text-white/45 text-[12px]">Noch keine Spots. Pin auf einen Ort mit freiem Nordblick setzen und „★ Spot speichern“ tippen.</div>';
+    $("spotsTag").textContent = "—";
+    return;
+  }
+  const rows = spots.map(s => {
+    const wx = state.spotWx.get(s.id);
+    const cloud = wx?.now ?? null;
+    const now = nowScoreAt(s.lat, s.lon, cloud);
+    const night = wx ? spotTonight(s, wx) : null;
+    return { s, cloud, now, night, dist: distKm(state.gpsLat ?? state.lat, state.gpsLon ?? state.lon, s.lat, s.lon) };
+  });
+  const rank = (r) => Math.max(r.now.dark !== "day" ? r.now.score : 0, r.night?.score ?? 0);
+  rows.sort((a, b) => rank(b) - rank(a) || (a.cloud ?? 100) - (b.cloud ?? 100));
+  const top = rows[0];
+  $("spotsTag").innerHTML = rank(top) > 0 ? `Beste Wahl: <b>${escapeHtml(top.s.name)}</b>` : `${rows.length} gespeichert`;
+  box.innerHTML = "";
+  for(const r of rows){
+    const el = document.createElement("div");
+    el.className = "row";
+    const nowTxt = r.now.dark === "day" ? "Tag" : `jetzt Score <b style="color:${scoreColor(r.now.score, r.now.dark)}">${r.now.score}</b>`;
+    const nightTxt = r.night ? `heute Nacht max <b>${r.night.score}</b>${r.night.score > 0 ? ` ~${fmtHour(r.night.date)} Uhr` : ""}` : "keine dunkle Phase";
+    el.innerHTML =
+      `<div style="min-width:0"><div class="font-black truncate">${r === top && rank(top) > 0 ? "★ " : ""}${escapeHtml(r.s.name)}</div>` +
+      `<div class="text-[11px] text-white/45 tnum">☁ ${r.cloud ?? "–"}% · ${nowTxt} · ${nightTxt} · ${Math.round(r.dist)} km</div></div>` +
+      `<div class="flex gap-2"><button class="icon-btn" data-go="${r.s.id}" title="Pin dorthin">→</button>` +
+      `<button class="icon-btn" data-del="${r.s.id}" title="Löschen">✕</button></div>`;
+    box.appendChild(el);
+  }
 }
 
 /***********************
  * Events
  ***********************/
 $("btnUpdate").addEventListener("click", () => { updateAll(true); refreshSlow(); });
+
+$("lyOval").addEventListener("click", () => toggleLayer("oval"));
+$("lyClouds").addEventListener("click", () => toggleLayer("clouds"));
+$("lySat").addEventListener("click", () => toggleLayer("sat"));
+$("btnGap").addEventListener("click", () => { if(gapTarget) moveTo(gapTarget.lat, gapTarget.lon, true); });
+$("btnSaveSpot").addEventListener("click", () => {
+  const def = $("cityName").textContent.replace("📍", "").trim();
+  const name = (prompt("Name für diesen Spot:", def) || "").trim();
+  if(!name) return;
+  spots.push({ id: Date.now(), name: name.slice(0, 40), lat: +state.lat.toFixed(4), lon: +state.lon.toFixed(4) });
+  saveSpots();
+  loadSpotsWeather(true);
+});
+$("spots").addEventListener("click", (e) => {
+  const go = e.target.closest("[data-go]"), del = e.target.closest("[data-del]");
+  if(go){ const s = spots.find(x => String(x.id) === go.dataset.go); if(s) moveTo(s.lat, s.lon, true); }
+  if(del){
+    const s = spots.find(x => String(x.id) === del.dataset.del);
+    if(s && confirm(`Spot „${s.name}“ löschen?`)){ spots = spots.filter(x => x !== s); state.spotWx.delete(s.id); saveSpots(); renderSpots(); }
+  }
+});
 
 $("btnGps").addEventListener("click", async () => {
   $("btnGps").textContent = "◎ suche…";
@@ -1320,6 +1748,7 @@ function applyTheme(){
     root.classList.toggle("light", theme === "light");
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "light" ? "#eef1f4" : "#070707");
     if(chartMain){ styleChart(chartMain); chartMain.update("none"); }
+    drawCloudGrid();
   }
   setBaseMap();
 }
@@ -1378,6 +1807,8 @@ document.addEventListener("visibilitychange", () => {
 async function init(){
   applyRed();
   renderAlertButton();
+  renderLayerButtons();
+  renderSpots();
   ["mtMap","gfzMag","ovationGlobal"].forEach(safeImg);
   try{
     splashProgress(10, "GPS…");
