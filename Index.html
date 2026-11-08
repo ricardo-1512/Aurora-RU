@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>AURORA X — v10</title>
+  <title>AURORA X — v10.1</title>
   <meta name="description" content="Polarlicht-Radar: Jetzt-Status, Nachtprognose, Polarlichtoval und Alarm für deinen Standort." />
   <meta name="theme-color" content="#070707" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -259,6 +259,16 @@
         <button id="btnShare" class="btn btn-sm" type="button">↗ Teilen</button>
       </div>
       <div class="mt-2 text-[10px] text-white/35 text-center" id="alertNote"></div>
+
+      <div id="logBox" class="mt-5 card p-3 text-center" style="display:none">
+        <div class="text-[11px] text-white/55 mb-2">Du bist draußen? Kurz eintragen, was du siehst. Damit wird der Score genauer.</div>
+        <div class="flex gap-2 justify-center flex-wrap">
+          <button class="btn btn-sm" type="button" data-log="eye">👁 Mit Auge</button>
+          <button class="btn btn-sm" type="button" data-log="camera">📷 Nur Kamera</button>
+          <button class="btn btn-sm" type="button" data-log="none">✗ Nichts</button>
+        </div>
+        <div class="mt-2 text-[11px] text-white/45" id="logAck"></div>
+      </div>
     </section>
 
     <!-- NACHT -->
@@ -433,6 +443,18 @@
           </select>
         </div>
       </div>
+
+      <div class="flex items-center justify-between gap-2 flex-wrap mt-5 mb-2">
+        <div class="badge">Sichtungs-Tagebuch</div>
+        <span class="badge" id="logTag">0 Einträge</span>
+      </div>
+      <div id="logStats" class="text-[12px] text-white/60"></div>
+      <div id="logList" class="text-sm mt-1"></div>
+      <div class="mt-2 flex gap-2 flex-wrap">
+        <button id="btnLogCsv" class="btn btn-sm" type="button">⬇ CSV</button>
+        <button id="btnLogCopy" class="btn btn-sm" type="button">⧉ Kopieren</button>
+      </div>
+      <div class="mt-2 text-[10px] text-white/35">Bleibt nur auf diesem Gerät. Schick mir die CSV, dann stimme ich die Schwellen auf deine echten Nächte ab.</div>
 
       <div class="badge mt-5 mb-2">So rechnet AURORA X</div>
       <div class="text-[12px] text-white/60 space-y-2 leading-relaxed">
@@ -1181,6 +1203,14 @@ function renderNow(){
   const edge = ovalEdge(lon);
   $("viewLat").textContent = edge !== null ? `${edge - VIEW_OFFSET}°N` : "--°N";
 
+  state.snapshot = {
+    lat:+lat.toFixed(3), lon:+lon.toFixed(3), city: $("cityName").textContent.replace("📍", "").trim(),
+    score, act:+act.toFixed(2), sky:+sky.toFixed(2), dark, sunAlt:+sunAlt.toFixed(1),
+    kp: sp.kp ?? null, kpEff: kpEff !== null ? +kpEff.toFixed(2) : null, need:+need.toFixed(2), mlat:+mlat.toFixed(1),
+    bz: sp.bz ?? null, bz15: sp.bz15 != null ? +sp.bz15.toFixed(1) : null, spd: sp.spd ?? null,
+    oval: ovalPct, cloud, moon: moonAlt > 0 ? Math.round(moonIllum) : 0, spot: settings.spot
+  };
+  $("logBox").style.display = dark === "day" ? "none" : "";
   return { score, lvl, dark, hasSpace, cloud };
 }
 
@@ -1691,10 +1721,74 @@ function renderSpots(){
   }
 }
 
+
+/***********************
+ * Sichtungs-Tagebuch (nur lokal)
+ ***********************/
+const LOG_LABEL = { eye:"👁 Mit Auge", camera:"📷 Nur Kamera", none:"✗ Nichts" };
+let sightLog = (safeJson(store("log")) || []).filter(e => e && e.t);
+function saveLog(){ store("log", JSON.stringify(sightLog.slice(-500))); }
+
+function addLog(kind){
+  if(!state.snapshot) return;
+  sightLog.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2,7)}`, t: new Date().toISOString(), seen: kind, ...state.snapshot });
+  saveLog();
+  $("logAck").textContent = `Gespeichert: ${LOG_LABEL[kind]} um ${fmtTime()} (Score ${state.snapshot.score}). Danke!`;
+  renderLog();
+}
+
+function renderLog(){
+  $("logTag").textContent = `${sightLog.length} ${sightLog.length === 1 ? "Eintrag" : "Einträge"}`;
+  const list = $("logList");
+  if(!sightLog.length){
+    $("logStats").textContent = "Noch keine Einträge. Wenn du nachts draußen bist, auf der Startseite „Mit Auge“, „Nur Kamera“ oder „Nichts“ tippen.";
+    list.innerHTML = "";
+    return;
+  }
+  // Trefferquote je Score-Bereich
+  const bands = [["0–24", 0, 24], ["25–54", 25, 54], ["55+", 55, 101]].map(([name, a, b]) => {
+    const e = sightLog.filter(x => x.score >= a && x.score <= b);
+    const hit = e.filter(x => x.seen !== "none").length;
+    return e.length ? `Score ${name}: ${hit}/${e.length} gesehen` : null;
+  }).filter(Boolean);
+  $("logStats").textContent = bands.join(" · ");
+  list.innerHTML = sightLog.slice(-8).reverse().map((e, i) => {
+    const d = new Date(e.t);
+    return `<div class="row"><div style="min-width:0"><div class="font-bold">${LOG_LABEL[e.seen] || e.seen}</div>` +
+           `<div class="text-[11px] text-white/45 tnum">${fmtDay(d)} ${fmtTime(d)} · ${escapeHtml(e.city || "")} · Score ${e.score} · Kp ${e.kp ?? "–"} · ☁ ${e.cloud ?? "–"}%</div></div>` +
+           `<button class="icon-btn" data-logdel="${e.id || e.t}" title="Löschen">✕</button></div>`;
+  }).join("");
+}
+
+function logCsv(){
+  const cols = ["t","seen","city","lat","lon","score","act","sky","dark","sunAlt","kp","kpEff","need","mlat","bz","bz15","spd","oval","cloud","moon","spot"];
+  const esc = v => v === null || v === undefined ? "" : /[",;\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : String(v);
+  return [cols.join(","), ...sightLog.map(e => cols.map(c => esc(e[c])).join(","))].join("\n");
+}
+
 /***********************
  * Events
  ***********************/
 $("btnUpdate").addEventListener("click", () => { updateAll(true); refreshSlow(); });
+
+document.querySelectorAll("[data-log]").forEach(b => b.addEventListener("click", () => addLog(b.dataset.log)));
+$("logList").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-logdel]");
+  if(b && confirm("Eintrag löschen?")){ sightLog = sightLog.filter(x => (x.id || x.t) !== b.dataset.logdel); saveLog(); renderLog(); }
+});
+$("btnLogCsv").addEventListener("click", () => {
+  const blob = new Blob([logCsv()], { type:"text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `aurora-tagebuch-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+$("btnLogCopy").addEventListener("click", async () => {
+  try{ await navigator.clipboard.writeText(logCsv()); $("btnLogCopy").textContent = "✓ Kopiert"; }
+  catch(e){ $("btnLogCopy").textContent = "Nicht möglich"; }
+  setTimeout(() => $("btnLogCopy").textContent = "⧉ Kopieren", 1500);
+});
 
 $("lyOval").addEventListener("click", () => toggleLayer("oval"));
 $("lyClouds").addEventListener("click", () => toggleLayer("clouds"));
@@ -1809,6 +1903,7 @@ async function init(){
   renderAlertButton();
   renderLayerButtons();
   renderSpots();
+  renderLog();
   ["mtMap","gfzMag","ovationGlobal"].forEach(safeImg);
   try{
     splashProgress(10, "GPS…");
