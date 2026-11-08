@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AURORA X — v8.0 Extreme Mobile</title>
+  <title>AURORA X — v8.1</title>
 
   <!-- UI -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -86,6 +86,10 @@
     }
     .tab.active{ background:rgba(34,197,94,.20); border:1px solid rgba(34,197,94,.40); color:var(--title); }
     .pb-tabs{ padding-bottom:110px; }
+    section{ scroll-margin-top:16px; }
+    .badge.is-live{ color:#4ade80; border-color:rgba(34,197,94,.35); }
+    .badge.is-warn{ color:#fbbf24; border-color:rgba(245,158,11,.35); }
+    .badge.is-off{ color:#f87171; border-color:rgba(239,68,68,.35); }
 
     /* Status colors */
     .status-alarm{ color:#ef4444; text-shadow: 0 0 24px rgba(239,68,68,.25); }
@@ -197,7 +201,7 @@
         <div class="badge">Bz Trend (letzte ~2h)</div>
         <span class="badge" id="chartTag">live</span>
       </div>
-      <canvas id="chartMain" height="180"></canvas>
+      <div style="position:relative;height:180px"><canvas id="chartMain"></canvas></div>
       <div class="mt-2 text-[11px] text-white/45">
         Faustregel: <span class="text-white/70">negativer</span> Bz hilft. Wenn Bz Richtung 0 dreht, schließt sich das Fenster oft wieder.
       </div>
@@ -243,16 +247,16 @@
   <!-- Bottom Tabs -->
   <div class="tabs">
     <div class="tabs-inner">
-      <div class="tab active" data-target="secNow">Jetzt</div>
-      <div class="tab" data-target="secMap">Karte</div>
-      <div class="tab" data-target="secCharts">Charts</div>
-      <div class="tab" data-target="secMore">Mehr</div>
+      <button type="button" class="tab active" data-target="secNow">Jetzt</button>
+      <button type="button" class="tab" data-target="secMap">Karte</button>
+      <button type="button" class="tab" data-target="secCharts">Charts</button>
+      <button type="button" class="tab" data-target="secMore">Mehr</button>
     </div>
   </div>
 
 <script>
 /***********************
- * AURORA X v8.0 — Extreme Mobile
+ * AURORA X v8.1
  ***********************/
 const $ = (id) => document.getElementById(id);
 
@@ -265,8 +269,8 @@ function hideSplash(){ $("splash").style.display = "none"; }
 
 /* Utils */
 function clamp(n,a,b){ return Math.max(a, Math.min(b,n)); }
-function fmtTimeLocal(d=new Date()){ return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"}); }
-
+function fmtTimeLocal(d=new Date()){ return d.toLocaleTimeString("de-DE", {hour:"2-digit", minute:"2-digit"}); }
+function num(v){ if(v === null || v === undefined || v === "") return null; const n = Number(v); return Number.isFinite(n) ? n : null; }
 function isErr(x){ return !!(x && typeof x === "object" && x.__error); }
 
 async function fetchJson(url, timeoutMs=12000){
@@ -282,20 +286,89 @@ async function fetchJson(url, timeoutMs=12000){
     clearTimeout(t);
   }
 }
-function extractHHMM(iso){
-  if(!iso) return null;
-  const d = new Date(iso);
-  if(isNaN(d)) return null;
-  return d.toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+
+/* NOAA liefert Zeitstempel ohne Zeitzone ("2026-11-08 12:34:00.000") – das ist UTC. */
+function parseUtc(v){
+  if(!v) return null;
+  let s = String(v).trim().replace(" ", "T");
+  if(!/[zZ]|[+-]\d\d:?\d\d$/.test(s)) s += "Z";
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
 }
-function lastValidRow(table, idx){
-  if(!Array.isArray(table)) return null;
-  for(let i=table.length-1; i>=1; i--){
-    const v = Number(table[i]?.[idx]);
-    if(Number.isFinite(v)) return table[i];
+
+/*
+ * NOAA-Produkte gibt es als Tabelle (erste Zeile = Spaltennamen) oder als Liste von Objekten.
+ * Diese Funktion liest beides und liefert [{t: Date, v: Number}] für die gewünschte Spalte.
+ */
+function noaaSeries(json, colNames){
+  if(!Array.isArray(json) || !json.length) return [];
+  const out = [];
+  if(Array.isArray(json[0])){
+    const head = json[0].map(h => String(h).toLowerCase());
+    const ti = head.indexOf("time_tag");
+    const vi = colNames.map(c => head.indexOf(c)).find(i => i >= 0) ?? -1;
+    if(ti < 0 || vi < 0) return [];
+    for(let i=1; i<json.length; i++){
+      const t = parseUtc(json[i]?.[ti]);
+      if(t) out.push({ t, v: num(json[i]?.[vi]) });
+    }
+  }else{
+    for(const row of json){
+      if(!row || typeof row !== "object") continue;
+      const t = parseUtc(row.time_tag);
+      const keys = Object.keys(row);
+      const key = colNames.map(c => keys.find(k => k.toLowerCase() === c)).find(Boolean);
+      if(t && key) out.push({ t, v: num(row[key]) });
+    }
   }
+  return out.sort((a,b) => a.t - b.t);
+}
+function lastValid(series){
+  for(let i=series.length-1; i>=0; i--) if(series[i].v !== null) return series[i];
   return null;
 }
+/* Messwert gilt nur als aktuell, wenn er nicht älter als maxMin Minuten ist. */
+function fresh(point, maxMin){
+  if(!point) return null;
+  return (Date.now() - point.t.getTime()) <= maxMin*60000 ? point : null;
+}
+
+/***********************
+ * Astronomie (lokal berechnet, keine API nötig)
+ ***********************/
+const RAD = Math.PI / 180;
+function toDays(date){ return date.valueOf()/86400000 - 0.5 + 2440588 - 2451545; }
+
+/* Sonnenhöhe in Grad (vereinfachtes Modell, Genauigkeit ~0,5°) */
+function sunAltitude(date, lat, lon){
+  const d = toDays(date);
+  const M = RAD * (357.5291 + 0.98560028 * d);
+  const C = RAD * (1.9148*Math.sin(M) + 0.02*Math.sin(2*M) + 0.0003*Math.sin(3*M));
+  const L = M + C + RAD*102.9372 + Math.PI;
+  const e = RAD * 23.4397;
+  const dec = Math.asin(Math.sin(e) * Math.sin(L));
+  const ra = Math.atan2(Math.sin(L) * Math.cos(e), Math.cos(L));
+  const H = RAD * (280.16 + 360.9856235 * d) + RAD*lon - ra;
+  const phi = RAD * lat;
+  return Math.asin(Math.sin(phi)*Math.sin(dec) + Math.cos(phi)*Math.cos(dec)*Math.cos(H)) / RAD;
+}
+
+/* Beleuchteter Mondanteil in % (über das Mondalter, Genauigkeit ein paar Prozent) */
+function moonIllumination(date=new Date()){
+  const synodic = 29.530588853;
+  const knownNew = Date.UTC(2000, 0, 6, 18, 14);
+  let age = ((date - knownNew) / 86400000) % synodic;
+  if(age < 0) age += synodic;
+  return (1 - Math.cos(2*Math.PI*age/synodic)) / 2 * 100;
+}
+
+/* Dunkelheit: Nacht ab Sonne < -12° (nautische Dämmerung vorbei), Dämmerung -12° … -6° */
+function darkness(alt){
+  if(alt <= -12) return "night";
+  if(alt <= -6)  return "twilight";
+  return "day";
+}
+const DARK_LABEL = { night:"Ja", twilight:"Dämmerung", day:"Nein" };
 
 /***********************
  * Endpoints
@@ -304,16 +377,16 @@ const NOAA = {
   mag1d: "https://services.swpc.noaa.gov/products/solar-wind/mag-1-day.json",
   plasma1d: "https://services.swpc.noaa.gov/products/solar-wind/plasma-1-day.json",
   kp: "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
+  kp1m: "https://services.swpc.noaa.gov/json/planetary_k_index_1m.json",
   ovation: "https://services.swpc.noaa.gov/images/aurora-forecast-northern-hemisphere.jpg"
 };
-const SUN_API = (lat, lon) => `https://api.sunrise-sunset.org/json?lat=${lat}&lng=${lon}&formatted=0`;
 const OPEN_METEO = (lat, lon) =>
   `https://api.open-meteo.com/v1/forecast?latitude=${encodeURIComponent(lat)}&longitude=${encodeURIComponent(lon)}` +
-  `&current=cloud_cover,is_day` +
-  `&daily=moon_illumination` +
-  `&timezone=auto`;
+  `&current=cloud_cover` +
+  `&daily=sunrise,sunset` +
+  `&timezone=auto&forecast_days=1`;
 
-/* GFZ quicklook (daily png) */
+/* GFZ quicklook (Tagesbild, Dateiname nach UTC-Datum) */
 function gfzQuicklookUrlYYYYMMDD(yyyy_mm_dd){
   return `https://kp.gfz-potsdam.de/fileadmin/kp-archiv/png/${yyyy_mm_dd}.png`;
 }
@@ -325,6 +398,8 @@ let currentLat = 50.83;
 let currentLon = 12.92;
 let map, marker;
 let chartMain = null;
+let updating = false;
+let lastUpdate = 0;
 
 /***********************
  * GPS + City
@@ -335,16 +410,18 @@ async function initGPS(){
     navigator.geolocation.getCurrentPosition(
       (pos) => { currentLat = pos.coords.latitude; currentLon = pos.coords.longitude; resolve(); },
       () => resolve(),
-      { enableHighAccuracy:true, timeout:9000 }
+      { enableHighAccuracy:false, timeout:9000, maximumAge:600000 }
     );
   });
 }
 
 async function reverseGeocodeCity(){
-  const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLon}`;
+  const url = `https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&accept-language=de` +
+              `&lat=${currentLat.toFixed(4)}&lon=${currentLon.toFixed(4)}`;
   const data = await fetchJson(url, 9000);
   if(isErr(data)){ $("cityName").textContent = "📍 Unbekannt"; return; }
-  const city = data.address?.city || data.address?.town || data.address?.village || "Standort";
+  const a = data.address || {};
+  const city = a.city || a.town || a.village || a.municipality || a.county || "Standort";
   $("cityName").textContent = `📍 ${city}`;
 }
 
@@ -352,6 +429,10 @@ async function reverseGeocodeCity(){
  * Map
  ***********************/
 function setupMap(){
+  if(typeof L === "undefined"){
+    $("map").innerHTML = '<div class="p-4 text-[11px] text-white/45">Karte konnte nicht geladen werden.</div>';
+    return;
+  }
   map = L.map("map", {
     zoomControl: true,
     dragging: true,
@@ -359,7 +440,10 @@ function setupMap(){
     scrollWheelZoom: false
   }).setView([currentLat, currentLon], 8);
 
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", { maxZoom: 18 }).addTo(map);
+  L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+    maxZoom: 18,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+  }).addTo(map);
 
   marker = L.marker([currentLat, currentLon], { draggable:true }).addTo(map);
   marker.on("dragend", () => {
@@ -367,23 +451,24 @@ function setupMap(){
     currentLat = p.lat;
     currentLon = p.lng;
     reverseGeocodeCity();
-    updateAll();
+    updateAll(true);
   });
 }
 
 /***********************
  * Score + Decision
  ***********************/
-function computeScore({kp,bz,spd,cloud,moon,isNight}){
+function computeScore({kp,bz,spd,cloud,moon,dark}){
   let score = 0;
 
-  if(kp !== null) score += kp * 12;                 // Kp 5 => 60
-  if(bz !== null && bz < 0) score += Math.abs(bz) * 2.0;  // Bz -10 => +20
+  if(kp !== null) score += kp * 12;                          // Kp 5 => 60
+  if(bz !== null && bz < 0) score += Math.abs(bz) * 2.0;     // Bz -10 => +20
   if(spd !== null && spd > 450) score += (spd - 450) * 0.05; // 650 => +10
 
   if(cloud !== null) score -= cloud * 0.6;
   if(moon !== null) score -= (moon/100) * 15;
-  if(!isNight) score -= 50;
+  if(dark === "day") score -= 50;
+  if(dark === "twilight") score -= 20;
 
   if(cloud !== null && cloud > 90) score *= 0.10;
   if(cloud !== null && cloud >= 98) score = 0;
@@ -399,17 +484,22 @@ function setStatus(label, cls, rec){
 }
 
 function decideStatus(score, meta){
-  const { isNight, cloud } = meta || {};
-  if(score >= 70 && isNight){
+  const { dark, cloud, hasSpaceData } = meta || {};
+  if(!hasSpaceData){
+    setStatus("—", "status-quiet", "Keine aktuellen Weltraumwetter-Daten. Gleich nochmal versuchen.");
+    return;
+  }
+  const darkEnough = dark !== "day";
+  if(score >= 70 && darkEnough){
     setStatus("ALARM", "status-alarm", "Raus! Richtung Norden. Testshots. Dunkler Spot.");
     return;
   }
-  if(score >= 40 && isNight){
+  if(score >= 40 && darkEnough){
     setStatus("CHANCE", "status-chance", "Beobachten. Kamera bereit halten. Norden testen.");
     return;
   }
-  if(!isNight){
-    setStatus("RUHIG", "status-quiet", "Zu hell (Tag/Dämmerung). Später nochmal checken.");
+  if(!darkEnough){
+    setStatus("RUHIG", "status-quiet", "Zu hell. Nach Ende der Dämmerung nochmal checken.");
     return;
   }
   if(cloud !== null && cloud > 85){
@@ -423,10 +513,14 @@ function decideStatus(score, meta){
  * Chart (Bz)
  ***********************/
 function renderChart(labels, bzVals){
-  const ctx = $("chartMain").getContext("2d");
-  if(chartMain) chartMain.destroy();
-
-  chartMain = new Chart(ctx, {
+  if(typeof Chart === "undefined") return;
+  if(chartMain){
+    chartMain.data.labels = labels;
+    chartMain.data.datasets[0].data = bzVals;
+    chartMain.update("none");
+    return;
+  }
+  chartMain = new Chart($("chartMain").getContext("2d"), {
     type:"line",
     data:{
       labels,
@@ -435,17 +529,24 @@ function renderChart(labels, bzVals){
         data:bzVals,
         borderWidth:2,
         pointRadius:0,
-        tension:0.35
+        tension:0.35,
+        spanGaps:true,
+        borderColor:"#4ade80",
+        fill:{ target:{ value:0 }, below:"rgba(34,197,94,.18)", above:"rgba(255,255,255,.03)" }
       }]
     },
     options:{
       responsive:true,
       maintainAspectRatio:false,
       animation:false,
+      interaction:{ mode:"index", intersect:false },
       plugins:{ legend:{display:false} },
       scales:{
         x:{ ticks:{ maxTicksLimit:6, color:"rgba(255,255,255,.55)" }, grid:{ color:"rgba(255,255,255,.08)" } },
-        y:{ ticks:{ color:"rgba(255,255,255,.55)" }, grid:{ color:"rgba(255,255,255,.08)" } }
+        y:{
+          ticks:{ color:"rgba(255,255,255,.55)" },
+          grid:{ color:(c) => c.tick.value === 0 ? "rgba(255,255,255,.35)" : "rgba(255,255,255,.08)" }
+        }
       }
     }
   });
@@ -457,21 +558,17 @@ function renderChart(labels, bzVals){
 function safeImg(id){
   const el = $(id);
   if(!el) return;
-  el.onerror = () => {
-    el.style.opacity = "0.35";
-    el.title = "Bild aktuell nicht erreichbar";
-  };
+  el.onerror = () => { el.style.opacity = "0.35"; el.title = "Bild aktuell nicht erreichbar"; };
+  el.onload  = () => { el.style.opacity = "1"; el.title = ""; };
 }
 
 function refreshMTWetter(){
-  const ts = Date.now();
-  $("mtMap").src = `https://aurora.mtwetter.de/forecast/aurora_map.png?ts=${ts}`;
+  $("mtMap").src = `https://aurora.mtwetter.de/forecast/aurora_map.png?ts=${Date.now()}`;
   $("mtTime").textContent = fmtTimeLocal();
 }
 
 function refreshGFZQuicklook(){
-  const d = new Date();
-  const yyyy_mm_dd = d.toISOString().slice(0,10);
+  const yyyy_mm_dd = new Date().toISOString().slice(0,10);
   $("gfzMag").src = `${gfzQuicklookUrlYYYYMMDD(yyyy_mm_dd)}?ts=${Date.now()}`;
   $("gfzTime").textContent = fmtTimeLocal();
 }
@@ -487,162 +584,174 @@ function refreshAllMaps(){
   refreshOvation();
 }
 
+function setLiveBadge(state){
+  const el = $("badgeLive");
+  el.classList.remove("is-live","is-warn","is-off");
+  if(state === "loading"){ el.textContent = "lade…"; return; }
+  if(state === "live"){ el.textContent = `live · ${fmtTimeLocal()}`; el.classList.add("is-live"); return; }
+  if(state === "partial"){ el.textContent = `teilweise · ${fmtTimeLocal()}`; el.classList.add("is-warn"); return; }
+  el.textContent = "offline"; el.classList.add("is-off");
+}
+
 /***********************
  * Main update
  ***********************/
-async function updateAll(){
-  $("badgeLive").textContent = "lade…";
+async function updateAll(force=false){
+  if(updating) return;
+  if(!force && document.hidden) return;
+  updating = true;
+  setLiveBadge("loading");
 
-  if(map && marker){
-    marker.setLatLng([currentLat, currentLon]);
-    map.setView([currentLat, currentLon], map.getZoom());
-  }
+  try{
+    const lat = currentLat, lon = currentLon;
 
-  const [mag, plasma, kpTable] = await Promise.all([
-    fetchJson(NOAA.mag1d, 12000),
-    fetchJson(NOAA.plasma1d, 12000),
-    fetchJson(NOAA.kp, 12000)
-  ]);
+    // Alles parallel laden
+    const [mag, plasma, kpTable, kp1m, wx] = await Promise.all([
+      fetchJson(NOAA.mag1d),
+      fetchJson(NOAA.plasma1d),
+      fetchJson(NOAA.kp),
+      fetchJson(NOAA.kp1m),
+      fetchJson(OPEN_METEO(lat, lon))
+    ]);
 
-  let bz = null, spd = null, kp = null;
+    // Weltraumwetter
+    const bzSeries = noaaSeries(mag, ["bz_gsm"]);
+    const bzPt = fresh(lastValid(bzSeries), 20);
+    const spdPt = fresh(lastValid(noaaSeries(plasma, ["speed"])), 20);
+    // Kp: zuerst die minütliche Schätzung, sonst der 3-Stunden-Wert
+    const kpPt = fresh(lastValid(noaaSeries(kp1m, ["estimated_kp","kp_index"])), 30)
+              || fresh(lastValid(noaaSeries(kpTable, ["kp"])), 6*60);
 
-  if(Array.isArray(mag)){
-    const last = lastValidRow(mag, 3);
-    bz = last ? Number(last[3]) : null;
-  }
+    const bz = bzPt?.v ?? null;
+    const spd = spdPt?.v ?? null;
+    const kp = kpPt?.v ?? null;
 
-  if(Array.isArray(plasma)){
-    const last = lastValidRow(plasma, 2);
-    spd = last ? Number(last[2]) : null;
-  }
-
-  if(Array.isArray(kpTable)){
-    const rows = kpTable.filter(r => r?.[0] && !isNaN(Date.parse(r[0])));
-    if(rows.length){
-      kp = Number(rows[rows.length-1][1]);
+    // Wetter
+    let cloud = null;
+    if(!isErr(wx)){
+      cloud = num(wx.current?.cloud_cover);
+      $("sunrise").textContent = (wx.daily?.sunrise?.[0] || "").slice(11,16) || "--:--";
+      $("sunset").textContent  = (wx.daily?.sunset?.[0]  || "").slice(11,16) || "--:--";
+    }else{
+      $("sunrise").textContent = "--:--";
+      $("sunset").textContent  = "--:--";
     }
+
+    // Sonne & Mond lokal berechnet
+    const sunAlt = sunAltitude(new Date(), lat, lon);
+    const dark = darkness(sunAlt);
+    const moonIllum = moonIllumination();
+
+    $("chipBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
+    $("chipKp").textContent = (kp !== null) ? kp.toFixed(1) : "--";
+    $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
+    $("uiNight").textContent = DARK_LABEL[dark];
+
+    $("valCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--%";
+    $("valMoon").textContent  = `${Math.round(moonIllum)}%`;
+
+    $("valCloudTxt").textContent =
+      cloud === null ? "—" : cloud >= 85 ? "Wolkig" : cloud >= 35 ? "Teils klar" : "Klar";
+    $("valMoonTxt").textContent =
+      moonIllum >= 75 ? "Hell" : moonIllum >= 35 ? "Mittel" : "Dunkel (top)";
+
+    $("nightNote").textContent =
+      `Sonne steht bei ${sunAlt.toFixed(0)}°. Richtig dunkel wird es ab -12°. ` +
+      `Für Polarlichter zählt Dunkelheit + klare Sicht.`;
+
+    const hasSpaceData = kp !== null || bz !== null;
+    const score = computeScore({ kp, bz, spd, cloud, moon: moonIllum, dark });
+
+    $("miniWhy").textContent =
+      `Score ${score}/100 • ` +
+      `${dark === "night" ? "Nacht" : dark === "twilight" ? "Dämmerung" : "Tag"} • ` +
+      `Kp ${kp !== null ? kp.toFixed(1) : "—"} • ` +
+      `Bz ${bz !== null ? bz.toFixed(1) : "—"} • ` +
+      `${spd !== null ? Math.round(spd)+" km/s • " : ""}` +
+      `${cloud !== null ? Math.round(cloud)+"% Wolken" : "Wolken —"}`;
+
+    decideStatus(score, { dark, cloud, hasSpaceData });
+
+    // Bz-Chart: letzte 2 Stunden, Labels und Werte immer paarweise
+    const cutoff = Date.now() - 2*3600000;
+    const recent = bzSeries.filter(p => p.t.getTime() >= cutoff);
+    $("chartTag").textContent = recent.length ? "live" : "keine Daten";
+    renderChart(recent.map(p => fmtTimeLocal(p.t)), recent.map(p => p.v));
+
+    const okCount = [hasSpaceData, cloud !== null].filter(Boolean).length;
+    setLiveBadge(okCount === 2 ? "live" : okCount === 1 ? "partial" : "offline");
+    lastUpdate = Date.now();
+  }catch(e){
+    console.error(e);
+    setLiveBadge("offline");
+  }finally{
+    updating = false;
   }
-
-  let cloud = null, moonIllum = null, isNight = false;
-
-  const wx = await fetchJson(OPEN_METEO(currentLat, currentLon), 12000);
-  if(!isErr(wx)){
-    cloud = (wx.current?.cloud_cover ?? null);
-    isNight = (wx.current?.is_day === 0);
-
-    const mi = wx.daily?.moon_illumination?.[0] ?? null;
-    if(mi !== null){
-      const pct = (mi <= 1.01) ? mi * 100 : mi;
-      moonIllum = clamp(pct, 0, 100);
-    }
-  }
-
-  const sun = await fetchJson(SUN_API(currentLat, currentLon), 12000);
-  if(!isErr(sun) && sun?.results){
-    $("sunrise").textContent = extractHHMM(sun.results.sunrise) || "--:--";
-    $("sunset").textContent  = extractHHMM(sun.results.sunset)  || "--:--";
-  }else{
-    $("sunrise").textContent = "--:--";
-    $("sunset").textContent  = "--:--";
-  }
-
-  $("chipBz").textContent = (bz !== null) ? bz.toFixed(1) : "--";
-  $("chipKp").textContent = (kp !== null) ? kp.toFixed(1) : "--";
-  $("chipCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--";
-  $("uiNight").textContent = isNight ? "Ja" : "Nein";
-
-  $("valCloud").textContent = (cloud !== null) ? `${Math.round(cloud)}%` : "--%";
-  $("valMoon").textContent  = (moonIllum !== null) ? `${Math.round(moonIllum)}%` : "--%";
-
-  if(cloud === null){
-    $("valCloudTxt").textContent = "—";
-  }else if(cloud >= 85){
-    $("valCloudTxt").textContent = "Wolkig";
-  }else if(cloud >= 35){
-    $("valCloudTxt").textContent = "Teils klar";
-  }else{
-    $("valCloudTxt").textContent = "Klar";
-  }
-
-  if(moonIllum === null){
-    $("valMoonTxt").textContent = "—";
-  }else if(moonIllum >= 75){
-    $("valMoonTxt").textContent = "Hell";
-  }else if(moonIllum >= 35){
-    $("valMoonTxt").textContent = "Mittel";
-  }else{
-    $("valMoonTxt").textContent = "Dunkel (top)";
-  }
-
-  const score = computeScore({ kp, bz, spd, cloud, moon: moonIllum, isNight });
-
-  $("miniWhy").textContent =
-    `Score ${score}/100 • ` +
-    `${isNight ? "Nacht" : "Tag/Dämmerung"} • ` +
-    `Kp ${kp !== null ? kp.toFixed(1) : "—"} • ` +
-    `Bz ${bz !== null ? bz.toFixed(1) : "—"} • ` +
-    `${cloud !== null ? Math.round(cloud)+"% Wolken" : "Wolken —"}`;
-
-  decideStatus(score, { isNight, cloud });
-
-  if(Array.isArray(mag)){
-    const slice = mag.slice(-70);
-    const labels = [];
-    const bzVals = [];
-    for(const r of slice){
-      const t = extractHHMM(r?.[0]);
-      const v = Number(r?.[3]);
-      if(t) labels.push(t);
-      bzVals.push(Number.isFinite(v) ? v : null);
-    }
-    renderChart(labels, bzVals);
-  }
-
-  $("badgeLive").textContent = "live";
-
-  refreshAllMaps();
 }
 
 /***********************
  * Events
  ***********************/
-$("btnUpdate").addEventListener("click", updateAll);
+$("btnUpdate").addEventListener("click", () => { updateAll(true); refreshAllMaps(); });
 
-document.querySelectorAll(".tab").forEach(tab=>{
+const tabs = document.querySelectorAll(".tab");
+function setActiveTab(id){
+  tabs.forEach(t => t.classList.toggle("active", t.getAttribute("data-target") === id));
+}
+tabs.forEach(tab=>{
   tab.addEventListener("click", ()=>{
-    document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
-    tab.classList.add("active");
     const id = tab.getAttribute("data-target");
-    const el = document.getElementById(id);
-    if(el) el.scrollIntoView({behavior:"smooth", block:"start"});
+    setActiveTab(id);
+    document.getElementById(id)?.scrollIntoView({behavior:"smooth", block:"start"});
   });
+});
+
+/* Aktiven Tab beim Scrollen mitführen */
+if("IntersectionObserver" in window){
+  const io = new IntersectionObserver((entries) => {
+    const vis = entries.filter(e => e.isIntersecting).sort((a,b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    if(vis.length) setActiveTab(vis[0].target.id);
+  }, { rootMargin: "-30% 0px -60% 0px" });
+  ["secNow","secMap","secCharts","secMore"].forEach(id => { const el = $(id); if(el) io.observe(el); });
+}
+
+/* Im Hintergrund pausieren (Akku), beim Zurückkehren sofort aktualisieren */
+document.addEventListener("visibilitychange", () => {
+  if(!document.hidden && Date.now() - lastUpdate > 60000){
+    updateAll();
+    refreshAllMaps();
+  }
 });
 
 /***********************
  * INIT
  ***********************/
 async function init(){
-  safeImg("mtMap");
-  safeImg("gfzMag");
-  safeImg("ovationGlobal");
+  try{
+    safeImg("mtMap");
+    safeImg("gfzMag");
+    safeImg("ovationGlobal");
 
-  splashProgress(10, "GPS…");
-  await initGPS();
+    splashProgress(10, "GPS…");
+    await initGPS();
 
-  splashProgress(35, "Karte…");
-  setupMap();
+    splashProgress(35, "Karte…");
+    setupMap();
 
-  splashProgress(55, "Ort…");
-  await reverseGeocodeCity();
+    splashProgress(55, "Daten…");
+    reverseGeocodeCity();
+    await updateAll(true);
+    refreshAllMaps();
 
-  splashProgress(75, "Sensoren…");
-  await updateAll();
-
-  splashProgress(100, "Fertig");
-  setTimeout(hideSplash, 350);
+    splashProgress(100, "Fertig");
+  }catch(e){
+    console.error(e);
+  }finally{
+    setTimeout(hideSplash, 350);
+  }
 
   setInterval(updateAll, 60000);
-  setInterval(refreshAllMaps, 300000);
+  setInterval(() => { if(!document.hidden) refreshAllMaps(); }, 300000);
 }
 
 init();
