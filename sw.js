@@ -1,7 +1,7 @@
 /* AURORA X Service Worker: App offline startbar machen, Live-Daten nie aus dem Cache */
-const CACHE = "aurorax-v9";
+const CACHE = "aurorax-v9.1";
 const SHELL = ["./Index.html", "./manifest.webmanifest", "./icon.svg", "./icon-180.png", "./icon-192.png"];
-const LIB_HOSTS = ["cdn.tailwindcss.com", "unpkg.com", "cdn.jsdelivr.net", "basemaps.cartocdn.com"];
+const LIB_HOSTS = ["cdn.tailwindcss.com", "unpkg.com", "cdn.jsdelivr.net", "server.arcgisonline.com", "tile.openstreetmap.org"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(SHELL.map(u => c.add(u)))).then(() => self.skipWaiting()));
